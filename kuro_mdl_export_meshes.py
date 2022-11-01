@@ -1,10 +1,10 @@
-# Research tool to understand ED9 / Kuro no Kiseki models in mdl format.  Not yet useful.
-# Based on Uyjulian's script.
+# Research tool to understand ED9 / Kuro no Kiseki models in mdl format.  Dumps meshes for
+# import into Blender.  Based on Uyjulian's script.
 # Usage:  Run by itself without commandline arguments and it will read only the mesh section of
-# every model it finds in the folder and output JSON files.
+# every model it finds in the folder and output fmt / ib / vb files.
 #
 # For command line options (including option to dump vertices), run:
-# /path/to/python3 kuro_mdl_extract_meshinfo.py
+# /path/to/python3 kuro_mdl_export_meshes.py
 #
 # Requires both blowfish and zstandard for CLE assets.
 # These can be installed by:
