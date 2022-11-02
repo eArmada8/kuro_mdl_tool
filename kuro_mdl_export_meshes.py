@@ -248,13 +248,13 @@ if __name__ == "__main__":
     # Set current directory
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
-    # If argument given, attempt to convert file in argument
+    # If argument given, attempt to export from file in argument
     if len(sys.argv) > 1:
         import argparse
         parser = argparse.ArgumentParser()
         parser.add_argument('-c', '--completemaps', help="Provide vgmaps with entire mesh skeleton", action="store_true")
         parser.add_argument('-o', '--overwrite', help="Overwrite existing files", action="store_true")
-        parser.add_argument('mdl_filename', help="Name of mdl file to convert (required).")
+        parser.add_argument('mdl_filename', help="Name of mdl file to export from (required).")
         args = parser.parse_args()
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
             process_mdl(args.mdl_filename, complete_maps = args.completemaps, overwrite = args.overwrite)
