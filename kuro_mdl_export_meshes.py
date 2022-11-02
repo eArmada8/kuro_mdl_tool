@@ -223,22 +223,26 @@ def write_fmt_ib_vb (mesh_buffers, filename, node_list = False, complete_maps = 
             f.write(json.dumps(vgmap_json, indent=4).encode("utf-8"))
     return
 
-def process_mdl (mdl_file, complete_maps = False):
+def process_mdl (mdl_file, complete_maps = False, overwrite = False):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     mdl_data = decryptCLE(mdl_data)
     mesh_data = isolate_mesh_data(mdl_data)
     mesh_struct = obtain_mesh_data(mesh_data)
     json_filename = mdl_file[:-4] + '/mdl_info.json'
-    if not os.path.exists(mdl_file[:-4]):
-        os.mkdir(mdl_file[:-4])
-    with open(json_filename, 'wb') as f:
-        f.write(json.dumps(mesh_struct["mesh_blocks"], indent=4).encode("utf-8"))
-    for i in range(len(mesh_struct["mesh_buffers"])):
-        for j in range(len(mesh_struct["mesh_buffers"][i])):
-            write_fmt_ib_vb(mesh_struct["mesh_buffers"][i][j], mdl_file[:-4] +\
-                '/{0}_{1}_{2:02d}'.format(i, mesh_struct["mesh_blocks"][i]["name"], j),\
-                node_list = mesh_struct["mesh_blocks"][i]["nodes"], complete_maps = complete_maps)
+    if os.path.exists(mdl_file[:-4]) and (os.path.isdir(mdl_file[:-4])) and (overwrite == False):
+        if str(input(mdl_file[:-4] + " folder exists! Overwrite? (y/N) ")).lower()[0:1] == 'y':
+            overwrite = True
+    if (overwrite == True) or not os.path.exists(mdl_file[:-4]):
+        if not os.path.exists(mdl_file[:-4]):
+            os.mkdir(mdl_file[:-4])
+        with open(json_filename, 'wb') as f:
+            f.write(json.dumps(mesh_struct["mesh_blocks"], indent=4).encode("utf-8"))
+        for i in range(len(mesh_struct["mesh_buffers"])):
+            for j in range(len(mesh_struct["mesh_buffers"][i])):
+                write_fmt_ib_vb(mesh_struct["mesh_buffers"][i][j], mdl_file[:-4] +\
+                    '/{0}_{1}_{2:02d}'.format(i, mesh_struct["mesh_blocks"][i]["name"], j),\
+                    node_list = mesh_struct["mesh_blocks"][i]["nodes"], complete_maps = complete_maps)
 
 if __name__ == "__main__":
     # Set current directory
@@ -249,10 +253,11 @@ if __name__ == "__main__":
         import argparse
         parser = argparse.ArgumentParser()
         parser.add_argument('-c', '--completemaps', help="Provide vgmaps with entire mesh skeleton", action="store_true")
+        parser.add_argument('-o', '--overwrite', help="Overwrite existing files", action="store_true")
         parser.add_argument('mdl_filename', help="Name of mdl file to convert (required).")
         args = parser.parse_args()
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
-            process_mdl(args.mdl_filename, complete_maps = args.completemaps)
+            process_mdl(args.mdl_filename, complete_maps = args.completemaps, overwrite = args.overwrite)
     else:
         mdl_files = glob.glob('*.mdl')
         for i in range(len(mdl_files)):
