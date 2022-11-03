@@ -13,7 +13,7 @@
 #
 # GitHub eArmada8/misc_kiseki
 
-import io, struct, sys, os, glob, base64, json, blowfish, operator, zstandard
+import io, struct, sys, os, shutil, glob, base64, json, blowfish, operator, zstandard
 from itertools import chain
 from lib_fmtibvb import *
 from kuro_mdl_export_meshes import *
@@ -155,19 +155,24 @@ def build_mesh_section (mdl_filename):
         output_buffer += mesh_block
     return(struct.pack("<2I", 1, len(output_buffer)) + output_buffer)
 
-def process_mdl (mdl_file, overwrite = False):
+def process_mdl (mdl_file):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     mdl_data = decryptCLE(mdl_data)
     material_data = build_material_section(mdl_file[:-4])
     mesh_data = build_mesh_section(mdl_file[:-4])
     new_mdl_data = insert_model_data(mdl_data, material_data, mesh_data)
-    if os.path.exists(mdl_file[:-4] + '_modified.mdl') and (overwrite == False):
-        if str(input(mdl_file[:-4] + "_modified.mdl already exists, please confirm overwrite: (y/N) ")).lower()[0:1] == 'y':
-            overwrite = True
-    if (overwrite == True) or not os.path.exists(mdl_file[:-4] + '_modified.mdl'):
-        with open(mdl_file[:-4] + '_modified.mdl','wb') as f:
-            f.write(new_mdl_data)
+    backup_suffix = ''
+    if os.path.exists(mdl_file + '.bak' + backup_suffix):
+        backup_suffix = '1'
+        if os.path.exists(mdl_file + '.bak' + backup_suffix):
+            while os.path.exists(mdl_file + '.bak' + backup_suffix):
+                backup_suffix = str(int(backup_suffix) + 1)
+        shutil.copy2(mdl_file, mdl_file + '.bak' + backup_suffix)
+    else:
+        shutil.copy2(mdl_file, mdl_file + '.bak')
+    with open(mdl_file,'wb') as f:
+        f.write(new_mdl_data)
 
 if __name__ == "__main__":
     # Set current directory
