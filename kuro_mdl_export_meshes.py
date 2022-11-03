@@ -28,6 +28,7 @@ def decryptCLE(file_content):
     magic = file_content[0:4]
     to_decrypt = [b"F9BA", b"C9BA"]
     to_decompress = [b"D9BA"]
+    result = file_content
     while (magic in to_decrypt) or (magic in to_decompress):
         if (magic in to_decrypt):
             result = b"".join(cipher.decrypt_ctr(file_content[8:], dec_counter))
