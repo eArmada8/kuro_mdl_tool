@@ -230,7 +230,7 @@ def process_mdl (mdl_file, complete_maps = False, overwrite = False):
     mdl_data = decryptCLE(mdl_data)
     mesh_data = isolate_mesh_data(mdl_data)
     mesh_struct = obtain_mesh_data(mesh_data)
-    json_filename = mdl_file[:-4] + '/mdl_info.json'
+    json_filename = mdl_file[:-4] + '/mesh_info.json'
     if os.path.exists(mdl_file[:-4]) and (os.path.isdir(mdl_file[:-4])) and (overwrite == False):
         if str(input(mdl_file[:-4] + " folder exists! Overwrite? (y/N) ")).lower()[0:1] == 'y':
             overwrite = True
