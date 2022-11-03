@@ -82,6 +82,7 @@ def obtain_mesh_data (mesh_section_bytes):
             mesh_buffers = []
             for j in range(mesh_block["primitive_count"]):
                 primitive = {}
+                primitive["id_referenceonly"] = j
                 primitive["material_offset"], primitive["num_of_elements"] = struct.unpack("<2I",f.read(8))
                 elements = []
                 ibvb = {}
@@ -225,6 +226,7 @@ def obtain_material_data (material_section_bytes):
         material_blocks = []
         for i in range(blocks):
             material_block = {}
+            material_block['id_referenceonly'] = i
             material_block['material_name'] = read_pascal_string(f).decode("ASCII")
             material_block['shader_name'] = read_pascal_string(f).decode("ASCII")
             material_block['str3'] = read_pascal_string(f).decode("ASCII")
