@@ -13,7 +13,7 @@
 #
 # GitHub eArmada8/misc_kiseki
 
-import io, struct, sys, os, glob, json, blowfish, operator, zstandard
+import io, struct, sys, os, glob, base64, json, blowfish, operator, zstandard
 from itertools import chain
 from lib_fmtibvb import *
 from kuro_mdl_export_meshes import *
@@ -21,7 +21,7 @@ from kuro_mdl_export_meshes import *
 def make_pascal_string(string):
     return struct.pack("<B", len(string)) + string.encode("utf8")
 
-def insert_mesh_data (mdl_data, mesh_section_data):
+def insert_model_data (mdl_data, material_section_data, mesh_section_data):
     with io.BytesIO(mdl_data) as f:
         new_mdl_data = f.read(12) #Header
         while True:
@@ -33,6 +33,8 @@ def insert_mesh_data (mdl_data, mesh_section_data):
                 section += f.read(section_info["size"])
             except:
                 break
+            if section_info["type"] == 0: # Material section to replace
+                section = material_section_data
             if section_info["type"] == 1: # Mesh section to replace
                 section = mesh_section_data
             new_mdl_data += section
@@ -40,6 +42,48 @@ def insert_mesh_data (mdl_data, mesh_section_data):
         f.seek(current_offset,0)
         new_mdl_data += f.read()
         return(new_mdl_data)
+
+def build_material_section (mdl_filename):
+    try:
+        material_struct = read_struct_from_json(mdl_filename + "/material_info.json")
+    except:
+        with open(mdl_filename + '.mdl', "rb") as f:
+            mdl_data = f.read()
+        mdl_data = decryptCLE(mdl_data)
+        material_data = isolate_material_data(mdl_data)
+        material_struct = obtain_material_data(mesh_data)
+    output_buffer = struct.pack("<I", len(material_struct))
+    for i in range(len(material_struct)):
+        material_block = make_pascal_string(material_struct[i]['material_name']) \
+            + make_pascal_string(material_struct[i]['shader_name']) \
+            + make_pascal_string(material_struct[i]['str3'])
+        texture_blocks = bytes()
+        texture_block_count = 0
+        for j in range(len(material_struct[i]['textures'])):
+            texture_blocks += make_pascal_string(material_struct[i]['textures'][j]['texture_image_name']) \
+                + struct.pack("<3I", material_struct[i]['textures'][j]['texture_slot'], material_struct[i]['textures'][j]['unk_01'], material_struct[i]['textures'][j]['unk_02'])
+            texture_block_count += 1
+        material_block += struct.pack("<I", texture_block_count) + texture_blocks
+        shader_elements = bytes()
+        shader_element_count = 0
+        for j in range(len(material_struct[i]['shaders'])):
+            shader_elements += make_pascal_string(material_struct[i]['shaders'][j]['shader_name']) \
+                + struct.pack("<I", material_struct[i]['shaders'][j]['type_int']) \
+                + base64.b64decode(material_struct[i]['shaders'][j]['data_base64'])
+            shader_element_count += 1
+        material_block += struct.pack("<I", shader_element_count) + shader_elements
+        material_switches = bytes()
+        material_switch_count = 0
+        for j in range(len(material_struct[i]['material_switches'])):
+            material_switches += make_pascal_string(material_struct[i]['material_switches'][j]['material_switch_name']) \
+                + struct.pack("<I", material_struct[i]['material_switches'][j]['int2'])
+            material_switch_count += 1
+        material_block += struct.pack("<I", material_switch_count) + material_switches
+        material_block += struct.pack("<I{0}B".format(len(material_struct[i]['uv_map_indices'])), len(material_struct[i]['uv_map_indices']), *material_struct[i]['uv_map_indices'])
+        material_block += struct.pack("<I{0}B".format(len(material_struct[i]['unknown1'])), len(material_struct[i]['unknown1']), *material_struct[i]['unknown1'])
+        material_block += struct.pack("<3IfI", *material_struct[i]['unknown2'])
+        output_buffer += material_block
+    return(struct.pack("<2I", 0, len(output_buffer)) + output_buffer)
 
 def build_mesh_section (mdl_filename):
     try:
@@ -115,8 +159,9 @@ def process_mdl (mdl_file, overwrite = False):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     mdl_data = decryptCLE(mdl_data)
+    material_data = build_material_section(mdl_file[:-4])
     mesh_data = build_mesh_section(mdl_file[:-4])
-    new_mdl_data = insert_mesh_data(mdl_data, mesh_data)
+    new_mdl_data = insert_model_data(mdl_data, material_data, mesh_data)
     if os.path.exists(mdl_file[:-4] + '_modified.mdl') and (overwrite == False):
         if str(input(mdl_file[:-4] + "_modified.mdl already exists, please confirm overwrite: (y/N) ")).lower()[0:1] == 'y':
             overwrite = True
