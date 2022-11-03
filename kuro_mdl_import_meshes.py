@@ -182,11 +182,10 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         import argparse
         parser = argparse.ArgumentParser()
-        parser.add_argument('-o', '--overwrite', help="Overwrite existing files", action="store_true")
         parser.add_argument('mdl_filename', help="Name of mdl file to import into (required).")
         args = parser.parse_args()
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
-            process_mdl(args.mdl_filename, overwrite = args.overwrite)
+            process_mdl(args.mdl_filename)
     else:
         mdl_files = glob.glob('*.mdl')
         mdl_files = [x for x in mdl_files if os.path.isdir(x[:-4])]
