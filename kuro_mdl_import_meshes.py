@@ -42,50 +42,63 @@ def insert_mesh_data (mdl_data, mesh_section_data):
         return(new_mdl_data)
 
 def build_mesh_section (mdl_filename):
-    mesh_struct = read_struct_from_json(mdl_filename + "/mdl_info.json")
+    try:
+        mesh_struct = read_struct_from_json(mdl_filename + "/mesh_info.json")
+    except:
+        with open(mdl_filename + '.mdl', "rb") as f:
+            mdl_data = f.read()
+        mdl_data = decryptCLE(mdl_data)
+        mesh_data = isolate_mesh_data(mdl_data)
+        mesh_struct = obtain_mesh_data(mesh_data)["mesh_blocks"]
     output_buffer = struct.pack("<I", len(mesh_struct))
     for i in range(len(mesh_struct)):
-        mesh_block = struct.pack("<I", len(mesh_struct[i]["primitives"]))
+        mesh_block = bytes()
+        meshes = 0 # Keep count of actual meshes imported
         for j in range(len(mesh_struct[i]["primitives"])):
-            mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, mesh_struct[i]["name"], j)
-            fmt = read_fmt(mesh_filename + '.fmt')
-            ib = list(chain.from_iterable(read_ib(mesh_filename + '.ib', fmt)))
-            vb = read_vb(mesh_filename + '.vb', fmt)
-            primitive_buffer = struct.pack("<2I", mesh_struct[i]["primitives"][j]["material_offset"], len(vb)+1)
-            for k in range(len(vb)):
-                match vb[k]["SemanticName"]:
-                    case "POSITION":
-                        type_int = 0
-                    case "NORMAL":
-                        type_int = 1
-                    case "TANGENT":
-                        type_int = 2
-                    case "UNKNOWN":
-                        type_int = 3
-                    case "TEXCOORD":
-                        type_int = 4
-                    case "BLENDWEIGHTS":
-                        type_int = 5
-                    case "BLENDINDICES":
-                        type_int = 6
-                dxgi_format = fmt["elements"][k]["Format"].split('DXGI_FORMAT_')[-1]
-                dxgi_format_split = dxgi_format.split('_')
-                vec_format = re.findall("[0-9]+",dxgi_format_split[0])
-                vec_elements = len(vec_format)
-                vec_stride = int(int(vec_format[0]) * len(vec_format) / 8)
-                match dxgi_format_split[1]:
-                    case "FLOAT":
-                        element_type = 'f'
-                    case "UINT":
-                        element_type = 'I' # Assuming 32-bit since Kuro models all use 32-bit
-                raw_buffer = struct.pack("<{0}{1}".format(vec_elements*len(vb[k]["Buffer"]), element_type), *list(chain.from_iterable(vb[k]["Buffer"])))
-                primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
-            # After VB, need to add IB
-            # Making assumptions here that it will always be in Rxx_UINT format, saves a bunch of code
-            vec_stride = int(int(re.findall("[0-9]+",fmt["format"].split('DXGI_FORMAT_')[-1].split('_')[0])[0]) / 8)
-            raw_ibuffer = struct.pack("<{0}I".format(len(ib), element_type), *ib)
-            primitive_buffer += struct.pack("<3I", 7, len(raw_ibuffer), vec_stride) + raw_ibuffer
-            mesh_block += primitive_buffer
+            try:
+                mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, mesh_struct[i]["name"], j)
+                fmt = read_fmt(mesh_filename + '.fmt')
+                ib = list(chain.from_iterable(read_ib(mesh_filename + '.ib', fmt)))
+                vb = read_vb(mesh_filename + '.vb', fmt)
+                primitive_buffer = struct.pack("<2I", mesh_struct[i]["primitives"][j]["material_offset"], len(vb)+1)
+                for k in range(len(vb)):
+                    match vb[k]["SemanticName"]:
+                        case "POSITION":
+                            type_int = 0
+                        case "NORMAL":
+                            type_int = 1
+                        case "TANGENT":
+                            type_int = 2
+                        case "UNKNOWN":
+                            type_int = 3
+                        case "TEXCOORD":
+                            type_int = 4
+                        case "BLENDWEIGHTS":
+                            type_int = 5
+                        case "BLENDINDICES":
+                            type_int = 6
+                    dxgi_format = fmt["elements"][k]["Format"].split('DXGI_FORMAT_')[-1]
+                    dxgi_format_split = dxgi_format.split('_')
+                    vec_format = re.findall("[0-9]+",dxgi_format_split[0])
+                    vec_elements = len(vec_format)
+                    vec_stride = int(int(vec_format[0]) * len(vec_format) / 8)
+                    match dxgi_format_split[1]:
+                        case "FLOAT":
+                            element_type = 'f'
+                        case "UINT":
+                            element_type = 'I' # Assuming 32-bit since Kuro models all use 32-bit
+                    raw_buffer = struct.pack("<{0}{1}".format(vec_elements*len(vb[k]["Buffer"]), element_type), *list(chain.from_iterable(vb[k]["Buffer"])))
+                    primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
+                # After VB, need to add IB
+                # Making assumptions here that it will always be in Rxx_UINT format, saves a bunch of code
+                vec_stride = int(int(re.findall("[0-9]+",fmt["format"].split('DXGI_FORMAT_')[-1].split('_')[0])[0]) / 8)
+                raw_ibuffer = struct.pack("<{0}I".format(len(ib), element_type), *ib)
+                primitive_buffer += struct.pack("<3I", 7, len(raw_ibuffer), vec_stride) + raw_ibuffer
+                mesh_block += primitive_buffer
+                meshes += 1
+            except:
+                pass
+        mesh_block = struct.pack("<I", meshes) + mesh_block
         node_block = struct.pack("<I", len(mesh_struct[i]["nodes"]))
         if len(mesh_struct[i]["nodes"]) > 0:
             for j in range(len(mesh_struct[i]["nodes"])):
