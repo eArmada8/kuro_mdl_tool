@@ -12,7 +12,7 @@
 #
 # GitHub eArmada8/misc_kiseki
 
-import io, struct, sys, os, glob, json, blowfish, operator, zstandard
+import io, struct, sys, os, glob, base64, json, blowfish, operator, zstandard
 from itertools import chain
 from lib_fmtibvb import *
 
@@ -197,6 +197,79 @@ def obtain_mesh_data (mesh_section_bytes):
         mesh_data["mesh_buffers"] = mesh_block_buffers
         return(mesh_data)
 
+def isolate_material_data (mdl_data):
+    with io.BytesIO(mdl_data) as f:
+        mdl_header = struct.unpack("<III",f.read(12))
+        if not mdl_header[0] == 0x204c444d:
+            sys.exit()
+        contents = []
+        while True:
+            current_offset = f.tell()
+            section_info = {}
+            try:
+                section_info["type"], section_info["size"] = struct.unpack("<II",f.read(8))
+            except:
+                break
+            section_info["section_start_offset"] = f.tell()
+            contents.append(section_info)
+            f.seek(section_info["size"],1) # Move forward to the next section
+        # Kuro models seem to only have one material section
+        material_section = [x for x in contents if x["type"] == 0][0]
+        f.seek(material_section["section_start_offset"],0)
+        material_section_data = f.read(material_section["size"])
+        return(material_section_data)
+
+def obtain_material_data (material_section_bytes):
+    with io.BytesIO(material_section_bytes) as f:
+        blocks, = struct.unpack("<I",f.read(4))
+        material_blocks = []
+        for i in range(blocks):
+            material_block = {}
+            material_block['material_name'] = read_pascal_string(f).decode("ASCII")
+            material_block['shader_name'] = read_pascal_string(f).decode("ASCII")
+            material_block['str3'] = read_pascal_string(f).decode("ASCII")
+            texture_element_count, = struct.unpack("<I",f.read(4))
+            material_block['textures'] = []
+            for j in range(texture_element_count):
+                texture_block = {}
+                texture_block['texture_image_name'] = read_pascal_string(f).decode("ASCII")
+                texture_block['texture_slot'], texture_block['unk_01'], texture_block['unk_02'] = struct.unpack("<3I",f.read(12))
+                material_block['textures'].append(texture_block)
+            shader_element_count, = struct.unpack("<I",f.read(4))
+            material_block['shaders'] = []
+            for j in range(shader_element_count):
+                shader_block = {}
+                shader_block['shader_name'] = read_pascal_string(f).decode("ASCII")
+                shader_block['type_int'], = struct.unpack("<I",f.read(4))
+                match shader_block['type_int']:
+                    case 0 | 1 | 4:
+                        shader_block['data_base64'] = base64.b64encode(f.read(4)).decode()
+                    case 2 | 5:
+                        shader_block['data_base64'] = base64.b64encode(f.read(8)).decode()
+                    case 3 | 6:
+                        shader_block['data_base64'] = base64.b64encode(f.read(12)).decode()
+                    case 7:
+                        shader_block['data_base64'] = base64.b64encode(f.read(16)).decode()
+                    case 8:
+                        shader_block['data_base64'] = base64.b64encode(f.read(64)).decode()
+                    case 0xFFFFFFFF:
+                        shader_block['data_base64'] = ''
+                material_block['shaders'].append(shader_block)
+            material_switch_count, = struct.unpack("<I",f.read(4))
+            material_block['material_switches'] = []
+            for j in range(material_switch_count):
+                material_switch_block = {}
+                material_switch_block['material_switch_name'] = read_pascal_string(f).decode("ASCII")
+                material_switch_block['int2'], = struct.unpack("<I",f.read(4))
+                material_block['material_switches'].append(material_switch_block)
+            uv_map_index_count, = struct.unpack("<I",f.read(4))
+            material_block['uv_map_indices'] = list(struct.unpack("{0}B".format(uv_map_index_count),f.read(uv_map_index_count)))
+            unknown1_count, = struct.unpack("<I",f.read(4))
+            material_block['unknown1'] = list(struct.unpack("{0}B".format(unknown1_count),f.read(unknown1_count)))
+            material_block['unknown2'] = list(struct.unpack("<3IfI",f.read(20)))
+            material_blocks.append(material_block)
+        return(material_blocks)
+
 def make_fmt_struct (mesh_buffers):
     fmt_struct = {}
     fmt_struct["stride"] = 0
@@ -230,15 +303,21 @@ def process_mdl (mdl_file, complete_maps = False, overwrite = False):
     mdl_data = decryptCLE(mdl_data)
     mesh_data = isolate_mesh_data(mdl_data)
     mesh_struct = obtain_mesh_data(mesh_data)
-    json_filename = mdl_file[:-4] + '/mesh_info.json'
+    mesh_json_filename = mdl_file[:-4] + '/mesh_info.json'
+    material_data = isolate_material_data(mdl_data)
+    material_struct = obtain_material_data(material_data)
+    material_json_filename = mdl_file[:-4] + '/material_info.json'
+    mesh_json_filename = mdl_file[:-4] + '/mesh_info.json'
     if os.path.exists(mdl_file[:-4]) and (os.path.isdir(mdl_file[:-4])) and (overwrite == False):
         if str(input(mdl_file[:-4] + " folder exists! Overwrite? (y/N) ")).lower()[0:1] == 'y':
             overwrite = True
     if (overwrite == True) or not os.path.exists(mdl_file[:-4]):
         if not os.path.exists(mdl_file[:-4]):
             os.mkdir(mdl_file[:-4])
-        with open(json_filename, 'wb') as f:
+        with open(mesh_json_filename, 'wb') as f:
             f.write(json.dumps(mesh_struct["mesh_blocks"], indent=4).encode("utf-8"))
+        with open(material_json_filename, 'wb') as f:
+            f.write(json.dumps(material_struct, indent=4).encode("utf-8"))
         for i in range(len(mesh_struct["mesh_buffers"])):
             for j in range(len(mesh_struct["mesh_buffers"][i])):
                 write_fmt_ib_vb(mesh_struct["mesh_buffers"][i][j], mdl_file[:-4] +\
