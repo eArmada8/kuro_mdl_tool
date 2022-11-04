@@ -1,10 +1,10 @@
-# Research tool to understand ED9 / Kuro no Kiseki models in mdl format.  Dumps meshes for
+# Tool to manipulate  ED9 / Kuro no Kiseki models in mdl format.  Dumps meshes for
 # import into Blender.  Based on Uyjulian's script.
 # Usage:  Run by itself without commandline arguments and it will read only the mesh section of
 # every model it finds in the folder and output fmt / ib / vb files.
 #
 # For command line options (including option to dump vertices), run:
-# /path/to/python3 kuro_mdl_export_meshes.py
+# /path/to/python3 kuro_mdl_export_meshes.py --help
 #
 # Requires both blowfish and zstandard for CLE assets.
 # These can be installed by:
@@ -67,11 +67,12 @@ def isolate_mesh_data (mdl_data):
         mesh_section_data = f.read(mesh_section["size"])
         return(mesh_section_data)
 
-def obtain_mesh_data (mesh_section_bytes):
+def obtain_mesh_data (mesh_section_bytes, trim_for_gpu = False):
     with io.BytesIO(mesh_section_bytes) as f:
         blocks, = struct.unpack("<I",f.read(4))
         mesh_blocks = []
         mesh_block_buffers = []
+        # Meshes are separated into groups (hair, body, shadow)
         for i in range(blocks):
             mesh_block = {}
             mesh_block["name"] = read_pascal_string(f).decode("ASCII")
@@ -80,15 +81,17 @@ def obtain_mesh_data (mesh_section_bytes):
             mesh_block["primitive_count"], = struct.unpack("<I",f.read(4))
             primitives = []
             mesh_buffers = []
+            # The individual meshes are parsed here
             for j in range(mesh_block["primitive_count"]):
                 primitive = {}
-                primitive["id_referenceonly"] = j
+                primitive["id_referenceonly"] = j # Not used at all for repacking, purely for convenience
                 primitive["material_offset"], primitive["num_of_elements"] = struct.unpack("<2I",f.read(8))
                 elements = []
                 ibvb = {}
                 buffers = []
-                semantic_index = [0,0,0,0,0,0,0,0]
+                semantic_index = [0,0,0,0,0,0,0,0] # Counters for multiple indicies (e.g. TEXCOORD1, 2, etc)
                 aligned_byte_offset = 0
+                element_num = 0 # Needed for accurate count in fmt when skipping elements
                 for k in range(primitive["num_of_elements"]):
                     element = {}
                     element["type_int"], element["size"], element["stride"] = struct.unpack("<3I",f.read(12))
@@ -106,7 +109,7 @@ def obtain_mesh_data (mesh_section_bytes):
                             element["Semantic"] = "TANGENT"
                             element_type = 'f'
                         case 3:
-                            element["Semantic"] = "UNKNOWN"
+                            element["Semantic"] = "UNKNOWN" # Seemingly unused, assets load fine without it
                             element_type = 'f'
                         case 4:
                             element["Semantic"] = "TEXCOORD"
@@ -123,26 +126,25 @@ def obtain_mesh_data (mesh_section_bytes):
                     element_index = semantic_index[element["type_int"]]
                     semantic_index[element["type_int"]] += 1
                     buffer = {}
-                    buffer["stride"] = element["stride"]
-                    buffer["count"] = element["count"]
+                    buffer["stride"] = element["stride"] # Purely for convenience, used later to make fmt
                     buffer_data = []
                     match element_type:
-                        case 'f':
+                        case 'f': #32-bit FLOAT
                             format_colors = ['R32','B32','G32','A32','D32']
                             for l in range(element["count"]):
                                 buffer_data.append(struct.unpack("<{0}f".format(int(element["stride"]/4)), f.read(element["stride"])))
                                 format_string = "".join(format_colors[0:int(element["stride"]/4)]) + "_FLOAT"
-                        case 'I':
+                        case 'I': #32-bit UINT
                             format_colors = ['R32','B32','G32','A32','D32']
                             for l in range(element["count"]):
                                 buffer_data.append(struct.unpack("<{0}I".format(int(element["stride"]/4)), f.read(element["stride"])))
                                 format_string = "".join(format_colors[0:int(element["stride"]/4)]) + "_UINT"
-                        case 'H':
+                        case 'H': #16-bit UINT, not sure this is used by Kuro at all
                             format_colors = ['R16','B16','G16','A16','D16']
                             for l in range(element["count"]):
                                 buffer_data.append(struct.unpack("<{0}H".format(int(element["stride"]/2)), f.read(element["stride"])))
                                 format_string = "".join(format_colors[0:int(element["stride"]/2)]) + "_UINT"
-                    buffer["fmt"] = {"id": str(k),
+                    buffer["fmt"] = {"id": str(element_num),
                         "SemanticName": element["Semantic"],\
                         "SemanticIndex": str(element_index),\
                         "Format": format_string,\
@@ -164,9 +166,12 @@ def obtain_mesh_data (mesh_section_bytes):
                                 ib["Buffer"].append(triangle)
                                 triangle = []
                     else:
-                        aligned_byte_offset += element["stride"]
-                        buffer["Buffer"] = buffer_data
-                        buffers.append(buffer)
+                        # If Trim for GPU is on, discard texcoords above the 3rd, and the unknown buffers
+                        if (trim_for_gpu == False) or (element_index < 3 and not element["type_int"] == 3):
+                            aligned_byte_offset += element["stride"]
+                            buffer["Buffer"] = buffer_data
+                            buffers.append(buffer)
+                            element_num += 1
                     elements.append(element)
                 ibvb["ib"] = ib
                 ibvb["vb"] = buffers
@@ -184,7 +189,7 @@ def obtain_mesh_data (mesh_section_bytes):
                         struct.unpack("<4f",f.read(16)), struct.unpack("<4f",f.read(16))]
                     nodes.append(node)
                 mesh_block["nodes"] = nodes
-            section2 = {}
+            section2 = {} # No idea what this is
             section2["size"], = struct.unpack("<I", f.read(4))
             if section2["size"] == 44:
                 section2["data"] = struct.unpack("<3fI3f4I", f.read(44))
@@ -224,9 +229,10 @@ def obtain_material_data (material_section_bytes):
     with io.BytesIO(material_section_bytes) as f:
         blocks, = struct.unpack("<I",f.read(4))
         material_blocks = []
+        # Materials are not grouped like meshes, but roughly follow the same order
         for i in range(blocks):
             material_block = {}
-            material_block['id_referenceonly'] = i
+            material_block['id_referenceonly'] = i # Not used at all for repacking, purely for convenience
             material_block['material_name'] = read_pascal_string(f).decode("ASCII")
             material_block['shader_name'] = read_pascal_string(f).decode("ASCII")
             material_block['str3'] = read_pascal_string(f).decode("ASCII")
@@ -289,6 +295,7 @@ def write_fmt_ib_vb (mesh_buffers, filename, node_list = False, complete_maps = 
     write_ib(mesh_buffers['ib']['Buffer'], filename +  '.ib', fmt_struct)
     write_vb(mesh_buffers['vb'], filename +  '.vb', fmt_struct)
     if not node_list == False:
+        # Find vertex groups referenced by vertices so that we can cull the empty ones
         active_nodes = list(set(list(chain.from_iterable([x["Buffer"] for x in mesh_buffers["vb"] \
             if x["fmt"]["SemanticName"] == 'BLENDINDICES'][0]))))
         vgmap_json = {}
@@ -299,17 +306,16 @@ def write_fmt_ib_vb (mesh_buffers, filename, node_list = False, complete_maps = 
             f.write(json.dumps(vgmap_json, indent=4).encode("utf-8"))
     return
 
-def process_mdl (mdl_file, complete_maps = False, overwrite = False):
+def process_mdl (mdl_file, complete_maps = False, trim_for_gpu = False, overwrite = False):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     mdl_data = decryptCLE(mdl_data)
     mesh_data = isolate_mesh_data(mdl_data)
-    mesh_struct = obtain_mesh_data(mesh_data)
+    mesh_struct = obtain_mesh_data(mesh_data, trim_for_gpu)
     mesh_json_filename = mdl_file[:-4] + '/mesh_info.json'
     material_data = isolate_material_data(mdl_data)
     material_struct = obtain_material_data(material_data)
     material_json_filename = mdl_file[:-4] + '/material_info.json'
-    mesh_json_filename = mdl_file[:-4] + '/mesh_info.json'
     if os.path.exists(mdl_file[:-4]) and (os.path.isdir(mdl_file[:-4])) and (overwrite == False):
         if str(input(mdl_file[:-4] + " folder exists! Overwrite? (y/N) ")).lower()[0:1] == 'y':
             overwrite = True
@@ -335,11 +341,12 @@ if __name__ == "__main__":
         import argparse
         parser = argparse.ArgumentParser()
         parser.add_argument('-c', '--completemaps', help="Provide vgmaps with entire mesh skeleton", action="store_true")
+        parser.add_argument('-t', '--trim_for_gpu', help="Trim vertex buffer for GPU injection (3DMigoto)", action="store_true")
         parser.add_argument('-o', '--overwrite', help="Overwrite existing files", action="store_true")
         parser.add_argument('mdl_filename', help="Name of mdl file to export from (required).")
         args = parser.parse_args()
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
-            process_mdl(args.mdl_filename, complete_maps = args.completemaps, overwrite = args.overwrite)
+            process_mdl(args.mdl_filename, complete_maps = args.completemaps, trim_for_gpu = args.trim_for_gpu, overwrite = args.overwrite)
     else:
         mdl_files = glob.glob('*.mdl')
         for i in range(len(mdl_files)):
