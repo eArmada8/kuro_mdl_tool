@@ -1,11 +1,11 @@
-# Research tool to understand ED9 / Kuro no Kiseki models in mdl format.  Replace mesh section of
+# Tool to manipulate ED9 / Kuro no Kiseki models in mdl format.  Replace mesh section of
 # Kuro no Kiseki mdl file with individual buffers previously exported.  Based on Uyjulian's script.
 # Usage:  Run by itself without commandline arguments and it will read only the mesh section of
 # every model it finds in the folder and replace them with fmt / ib / vb files in the same named
 # directory.
 #
-# For command line options (including option to dump vertices), run:
-# /path/to/python3 kuro_mdl_export_meshes.py
+# For command line options, run:
+# /path/to/python3 kuro_mdl_import_meshes.py --help
 #
 # Requires both blowfish and zstandard for CLE assets.
 # These can be installed by:
@@ -44,6 +44,7 @@ def insert_model_data (mdl_data, material_section_data, mesh_section_data):
         return(new_mdl_data)
 
 def build_material_section (mdl_filename):
+    # Will read data from JSON file, or load original data from the mdl file if JSON is missing
     try:
         material_struct = read_struct_from_json(mdl_filename + "/material_info.json")
     except:
@@ -97,7 +98,7 @@ def build_mesh_section (mdl_filename):
     output_buffer = struct.pack("<I", len(mesh_struct))
     for i in range(len(mesh_struct)):
         mesh_block = bytes()
-        meshes = 0 # Keep count of actual meshes imported
+        meshes = 0 # Keep count of actual meshes imported, in case some have been deleted
         for j in range(len(mesh_struct[i]["primitives"])):
             try:
                 mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, mesh_struct[i]["name"], j)
@@ -162,6 +163,7 @@ def process_mdl (mdl_file):
     material_data = build_material_section(mdl_file[:-4])
     mesh_data = build_mesh_section(mdl_file[:-4])
     new_mdl_data = insert_model_data(mdl_data, material_data, mesh_data)
+    # Instead of overwriting backups, it will just tag a number onto the end
     backup_suffix = ''
     if os.path.exists(mdl_file + '.bak' + backup_suffix):
         backup_suffix = '1'
