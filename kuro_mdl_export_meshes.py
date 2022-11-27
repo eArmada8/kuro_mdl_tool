@@ -290,6 +290,7 @@ def make_fmt_struct (mesh_buffers):
     return(fmt_struct)
 
 def write_fmt_ib_vb (mesh_buffers, filename, node_list = False, complete_maps = False):
+    print("Processing submesh {0}...".format(filename))
     fmt_struct = make_fmt_struct(mesh_buffers)
     write_fmt(fmt_struct, filename + '.fmt')
     write_ib(mesh_buffers['ib']['Buffer'], filename +  '.ib', fmt_struct)
@@ -309,6 +310,7 @@ def write_fmt_ib_vb (mesh_buffers, filename, node_list = False, complete_maps = 
 def process_mdl (mdl_file, complete_maps = False, trim_for_gpu = False, overwrite = False):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
+    print("Processing {0}...".format(mdl_file))
     mdl_data = decryptCLE(mdl_data)
     mesh_data = isolate_mesh_data(mdl_data)
     mesh_struct = obtain_mesh_data(mesh_data, trim_for_gpu)
@@ -327,10 +329,14 @@ def process_mdl (mdl_file, complete_maps = False, trim_for_gpu = False, overwrit
         with open(material_json_filename, 'wb') as f:
             f.write(json.dumps(material_struct, indent=4).encode("utf-8"))
         for i in range(len(mesh_struct["mesh_buffers"])):
+            if mesh_struct["mesh_blocks"][i]["node_count"] > 0:
+                node_list = mesh_struct["mesh_blocks"][i]["nodes"]
+            else:
+                node_list = False
             for j in range(len(mesh_struct["mesh_buffers"][i])):
                 write_fmt_ib_vb(mesh_struct["mesh_buffers"][i][j], mdl_file[:-4] +\
                     '/{0}_{1}_{2:02d}'.format(i, mesh_struct["mesh_blocks"][i]["name"], j),\
-                    node_list = mesh_struct["mesh_blocks"][i]["nodes"], complete_maps = complete_maps)
+                    node_list = node_list, complete_maps = complete_maps)
 
 if __name__ == "__main__":
     # Set current directory
