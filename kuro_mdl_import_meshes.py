@@ -144,9 +144,13 @@ def build_mesh_section (mdl_filename):
             except:
                 pass
         mesh_block = struct.pack("<I", meshes) + mesh_block
-        node_block = struct.pack("<I", len(mesh_struct[i]["nodes"]))
-        if len(mesh_struct[i]["nodes"]) > 0:
-            for j in range(len(mesh_struct[i]["nodes"])):
+        if "nodes" in mesh_struct[i].keys():
+            node_count = len(mesh_struct[i]["nodes"])
+        else:
+            node_count = 0
+        node_block = struct.pack("<I", node_count)
+        if node_count > 0:
+            for j in range(node_count):
                 node_block += make_pascal_string(mesh_struct[i]["nodes"][j]["name"])
                 node_block += struct.pack("<16f", *list(chain.from_iterable(mesh_struct[i]["nodes"][j]["matrix"])))
         mesh_block += node_block
@@ -159,6 +163,7 @@ def build_mesh_section (mdl_filename):
 def process_mdl (mdl_file):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
+    print("Processing {0}...".format(mdl_file))
     mdl_data = decryptCLE(mdl_data)
     material_data = build_material_section(mdl_file[:-4])
     mesh_data = build_mesh_section(mdl_file[:-4])
