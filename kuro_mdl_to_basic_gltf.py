@@ -1,8 +1,18 @@
-import io, struct, sys, os, glob, base64, json, blowfish, operator, zstandard
-from itertools import chain
-from lib_fmtibvb import *
+# Tool to convert ED9 / Kuro no Kiseki models in mdl format to glTF.  Not as useful as uyjulian's
+# script, but is meant to be used as a research tool.
+#
+# Usage:  Run by itself without commandline arguments and it will convert mdl files that it finds.
+#
+# For command line options (including option to dump vertices), run:
+# /path/to/python3 kuro_mdl_to_basic_gltf.py --help
+#
+# Requires both blowfish and zstandard for CLE assets.
+# These can be installed by:
+# /path/to/python3 -m pip install blowfish zstandard
+#
+# GitHub eArmada8/misc_kiseki
 
-import numpy, copy
+import io, struct, sys, os, glob, numpy, copy, json
 from pyquaternion import Quaternion
 from kuro_mdl_export_meshes import *
 
