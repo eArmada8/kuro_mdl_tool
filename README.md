@@ -36,8 +36,15 @@ Trim vertex buffer for GPU injection (3DMigoto).  Meshes in the MDL contain have
 `-o, --overwrite`
 Overwrite existing files without prompting.
 
+**Complete VGMap Setting:**
+Many modders prefer that complete VGmaps is the default, rather than a command line option.  You can (permanently) change the default behavior by editing the python script itself.  There is a line at the top:
+`complete_vgmaps_default = True`
+which you can change to 
+`complete_vgmaps_default = False`
+This will also change the command line argument `-c, --completemaps` into `-p, --partialmaps` which you would call to enable non-empty group vgmaps instead.
+
 ### kuro_mdl_import_meshes.py
-Double click the python script and it will search the current folder for all .mdl files with exported folders, and import the meshes in the folder back into the mdl file.  Additionally, it will parse the 2 JSON files (mesh metadata and materials) if available and use that information to rebuild the mesh and materials sections.  This script requires a working mdl file already be present as it does not reconstruct the entire file; only the known relevant sections.  The remaining parts of the file (bone heirarchy, any animation data, etc) are copied unaltered from the intact mdl file.
+Double click the python script and it will search the current folder for all .mdl files with exported folders, and import the meshes in the folder back into the mdl file.  Additionally, it will parse the 2 JSON files (mesh metadata and materials) if available and use that information to rebuild the mesh and materials sections.  This script requires a working mdl file already be present as it does not reconstruct the entire file; only the known relevant sections.  The remaining parts of the file (bone heirarchy, any animation data, etc) are copied unaltered from the intact mdl file.  By default, it will apply zstandard compression to the final file.
 
 It will make a backup of the original, then overwrite the original.  It will not overwrite backups; for example if "model.mdl.bak" already exists, then it will write the backup to "model.mdl.bak1", then to "model.mdl.bak2", and so on.
 
@@ -46,3 +53,28 @@ It will make a backup of the original, then overwrite the original.  It will not
 
 `-h, --help`
 Shows help message.
+
+`-u, --uncompressed`
+Do not apply zstandard compression.
+
+### kuro_mdl_to_basic_gltf.py
+Double click the python script to run and it will attempt to convert the MDL model into a basic glTF model, with skeleton.  This tool as written is for obtaining the skeleton for rigging the .fmt/.ib/.vb/.vgmap meshes from the export tool.  *The meshes included in the model are not particularly useful as they cannot be exported back to MDL,* just delete them and import the exported meshes (.fmt/.ib/.vb./vgmap) instead - the tool only includes meshes because Blender refuses to open a glTF file without meshes.  After importing the meshes, Ctrl-click on the armature and parent (Object -> Parent -> Armature Deform {without the extra options}).
+
+It will search the current folder for mdl files and convert them all, unless you use command line options.
+
+**Command line arguments:**
+`kuro_mdl_to_basic_gltf.py [-h] [-o] mdl_filename`
+
+`-h, --help`
+Shows help message.
+
+`-o, --overwrite`
+Overwrite existing files without prompting.
+
+### cle_compress.py
+This script will compress files with zstandard so they can be used in Kuro no Kiseki 2 (CLE release).  If double-clicked, it will compress all files it finds in the current directory, assuming they are not .py, .bak, or already compressed.  This is not necessary with output from the importer since the files are already compressed, but would be needed for textures, etc.
+
+**Command line arguments:**
+`cle_compress.py [-h] filename`
+
+No command line options, but you can compress single files using the command line.
