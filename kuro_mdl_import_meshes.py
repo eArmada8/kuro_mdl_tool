@@ -18,6 +18,16 @@ from itertools import chain
 from lib_fmtibvb import *
 from kuro_mdl_export_meshes import *
 
+def compressCLE(file_content):
+    magic = file_content[0:4]
+    compressed_magic = b"D9BA"
+    result = file_content
+    if not magic == compressed_magic: # Don't compress files that are already compressed:
+        compressor = zstandard.ZstdCompressor(level = 12, write_checksum = True)
+        result = compressor.compress(file_content)
+        result = compressed_magic + struct.pack("<I", len(result)) + result
+    return result
+
 def make_pascal_string(string):
     return struct.pack("<B", len(string)) + string.encode("utf8")
 
@@ -189,7 +199,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
             primitive_section_buffer += struct.pack("<2I", 4, len(primitive_output_buffer)) + primitive_output_buffer
     return(mesh_section_buffer, primitive_section_buffer)
 
-def process_mdl (mdl_file):
+def process_mdl (mdl_file, compress = True):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
@@ -208,6 +218,8 @@ def process_mdl (mdl_file):
         shutil.copy2(mdl_file, mdl_file + '.bak' + backup_suffix)
     else:
         shutil.copy2(mdl_file, mdl_file + '.bak')
+    if compress == True:
+        new_mdl_data = compressCLE(new_mdl_data)
     with open(mdl_file,'wb') as f:
         f.write(new_mdl_data)
 
@@ -219,10 +231,11 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         import argparse
         parser = argparse.ArgumentParser()
+        parser.add_argument('-u', '--uncompressed', help="Do not apply zstandard compression", action="store_false")
         parser.add_argument('mdl_filename', help="Name of mdl file to import into (required).")
         args = parser.parse_args()
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
-            process_mdl(args.mdl_filename)
+            process_mdl(args.mdl_filename, compress = args.uncompressed)
     else:
         mdl_files = glob.glob('*.mdl')
         mdl_files = [x for x in mdl_files if os.path.isdir(x[:-4])]
