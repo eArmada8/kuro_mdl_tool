@@ -323,8 +323,7 @@ def process_mdl (mdl_file, overwrite = False):
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
     mdl_data = decryptCLE(mdl_data)
-    mesh_data = isolate_mesh_data(mdl_data)
-    mesh_struct = obtain_mesh_data(mesh_data, trim_for_gpu = True)
+    mesh_struct = obtain_mesh_data(mdl_data, trim_for_gpu = True)
     skel_data = isolate_skeleton_data(mdl_data)
     skel_struct = obtain_skeleton_data(skel_data)
     if os.path.exists(mdl_file[:-4] + '.gltf') and (overwrite == False):
