@@ -40,6 +40,12 @@ def decryptCLE(file_content):
 
     return result
 
+def get_kuro_ver (mdl_data):
+    if mdl_data[4] == 1:
+        return(1)
+    else:
+        return(2)
+
 # From Julian Uy's ED9 MDL parser, thank you
 def read_pascal_string(f):
     sz = int.from_bytes(f.read(1), byteorder="little")
@@ -67,8 +73,51 @@ def isolate_mesh_data (mdl_data):
         mesh_section_data = f.read(mesh_section["size"])
         return(mesh_section_data)
 
-def obtain_mesh_data (mesh_section_bytes, trim_for_gpu = False):
-    with io.BytesIO(mesh_section_bytes) as f:
+# Kuro 2 has separate primitive section
+def isolate_primitive_data (mdl_data):
+    with io.BytesIO(mdl_data) as f:
+        mdl_header = struct.unpack("<III",f.read(12))
+        if not mdl_header[0] == 0x204c444d:
+            sys.exit()
+        contents = []
+        while True:
+            current_offset = f.tell()
+            section_info = {}
+            try:
+                section_info["type"], section_info["size"] = struct.unpack("<II",f.read(8))
+            except:
+                break
+            section_info["section_start_offset"] = f.tell()
+            contents.append(section_info)
+            f.seek(section_info["size"],1) # Move forward to the next section
+        # Kuro models seem to only have one primitive section?
+        primitive_section = [x for x in contents if x["type"] == 4][0]
+        f.seek(primitive_section["section_start_offset"],0)
+        primitive_section_data = f.read(primitive_section["size"])
+        return(primitive_section_data)
+
+def parse_primitive_header (primitive_data):
+    with io.BytesIO(primitive_data) as f:
+        blocks, = struct.unpack("<I",f.read(4))
+        data_offset = blocks * 20 + 4
+        primitive_info = []
+        for i in range(blocks):
+            element = {}
+            element["type_int"], element["size"], element["stride"], element["mesh"],\
+                element["submesh"] = struct.unpack("<5I",f.read(20))
+            element["offset"] = data_offset
+            data_offset += element["size"]
+            primitive_info.append(element)
+    return(primitive_info)
+            
+def obtain_mesh_data (mdl_data, trim_for_gpu = False):
+    kuro_ver = get_kuro_ver(mdl_data)
+    mesh_data = isolate_mesh_data(mdl_data)
+    if kuro_ver > 1:
+        primitive_data = isolate_primitive_data(mdl_data)
+        primitive_info = parse_primitive_header(primitive_data)
+        prim = io.BytesIO(primitive_data)
+    with io.BytesIO(mesh_data) as f:
         blocks, = struct.unpack("<I",f.read(4))
         mesh_blocks = []
         mesh_block_buffers = []
@@ -81,11 +130,15 @@ def obtain_mesh_data (mesh_section_bytes, trim_for_gpu = False):
             mesh_block["primitive_count"], = struct.unpack("<I",f.read(4))
             primitives = []
             mesh_buffers = []
-            # The individual meshes are parsed here
             for j in range(mesh_block["primitive_count"]):
                 primitive = {}
                 primitive["id_referenceonly"] = j # Not used at all for repacking, purely for convenience
-                primitive["material_offset"], primitive["num_of_elements"] = struct.unpack("<2I",f.read(8))
+                primitive["material_offset"], = struct.unpack("<I",f.read(4))
+                if kuro_ver == 1:
+                    primitive["num_of_elements"], = struct.unpack("<I",f.read(4))
+                elif kuro_ver > 1:
+                    primitive["num_of_elements"] = len([x for x in primitive_info if x['mesh'] == i and x['submesh'] == j])
+                    primitive["triangle_count"], primitive["unk"] = struct.unpack("<2I",f.read(8))
                 elements = []
                 ibvb = {}
                 buffers = []
@@ -94,8 +147,14 @@ def obtain_mesh_data (mesh_section_bytes, trim_for_gpu = False):
                 element_num = 0 # Needed for accurate count in fmt when skipping elements
                 for k in range(primitive["num_of_elements"]):
                     element = {}
-                    element["type_int"], element["size"], element["stride"] = struct.unpack("<3I",f.read(12))
-                    element["offset"] = f.tell()
+                    if kuro_ver == 1:
+                        element["type_int"], element["size"], element["stride"] = struct.unpack("<3I",f.read(12))
+                        element["offset"] = f.tell()
+                    elif kuro_ver > 1:
+                        prim_element = [x for x in primitive_info if x['mesh'] == i and x['submesh'] == j][k]
+                        element["type_int"], element["size"], element["stride"], element["offset"] =\
+                            prim_element["type_int"], prim_element["size"], prim_element["stride"], prim_element["offset"]
+                        prim.seek(prim_element["offset"])
                     element["count"] = int(element["size"]/element["stride"])
                     # Vertex reading here!!
                     match element["type_int"]:
@@ -132,17 +191,26 @@ def obtain_mesh_data (mesh_section_bytes, trim_for_gpu = False):
                         case 'f': #32-bit FLOAT
                             format_colors = ['R32','B32','G32','A32','D32']
                             for l in range(element["count"]):
-                                buffer_data.append(struct.unpack("<{0}f".format(int(element["stride"]/4)), f.read(element["stride"])))
+                                if kuro_ver == 1:
+                                    buffer_data.append(struct.unpack("<{0}f".format(int(element["stride"]/4)), f.read(element["stride"])))
+                                elif kuro_ver > 1:
+                                    buffer_data.append(struct.unpack("<{0}f".format(int(element["stride"]/4)), prim.read(element["stride"])))
                                 format_string = "".join(format_colors[0:int(element["stride"]/4)]) + "_FLOAT"
                         case 'I': #32-bit UINT
                             format_colors = ['R32','B32','G32','A32','D32']
                             for l in range(element["count"]):
-                                buffer_data.append(struct.unpack("<{0}I".format(int(element["stride"]/4)), f.read(element["stride"])))
+                                if kuro_ver == 1:
+                                    buffer_data.append(struct.unpack("<{0}I".format(int(element["stride"]/4)), f.read(element["stride"])))
+                                elif kuro_ver > 1:
+                                    buffer_data.append(struct.unpack("<{0}I".format(int(element["stride"]/4)), prim.read(element["stride"])))
                                 format_string = "".join(format_colors[0:int(element["stride"]/4)]) + "_UINT"
                         case 'H': #16-bit UINT, not sure this is used by Kuro at all
                             format_colors = ['R16','B16','G16','A16','D16']
                             for l in range(element["count"]):
-                                buffer_data.append(struct.unpack("<{0}H".format(int(element["stride"]/2)), f.read(element["stride"])))
+                                if kuro_ver == 1:
+                                    buffer_data.append(struct.unpack("<{0}H".format(int(element["stride"]/2)), f.read(element["stride"])))
+                                elif kuro_ver > 1:
+                                    buffer_data.append(struct.unpack("<{0}H".format(int(element["stride"]/2)), prim.read(element["stride"])))
                                 format_string = "".join(format_colors[0:int(element["stride"]/2)]) + "_UINT"
                     buffer["fmt"] = {"id": str(element_num),
                         "SemanticName": element["Semantic"],\
@@ -201,7 +269,9 @@ def obtain_mesh_data (mesh_section_bytes, trim_for_gpu = False):
         mesh_data = {}
         mesh_data["mesh_blocks"] = mesh_blocks
         mesh_data["mesh_buffers"] = mesh_block_buffers
-        return(mesh_data)
+    if kuro_ver > 1:
+        prim.close()
+    return(mesh_data)
 
 def isolate_material_data (mdl_data):
     with io.BytesIO(mdl_data) as f:
@@ -225,8 +295,10 @@ def isolate_material_data (mdl_data):
         material_section_data = f.read(material_section["size"])
         return(material_section_data)
 
-def obtain_material_data (material_section_bytes):
-    with io.BytesIO(material_section_bytes) as f:
+def obtain_material_data (mdl_data):
+    kuro_ver = get_kuro_ver(mdl_data)
+    material_data = isolate_material_data(mdl_data)
+    with io.BytesIO(material_data) as f:
         blocks, = struct.unpack("<I",f.read(4))
         material_blocks = []
         # Materials are not grouped like meshes, but roughly follow the same order
@@ -241,7 +313,9 @@ def obtain_material_data (material_section_bytes):
             for j in range(texture_element_count):
                 texture_block = {}
                 texture_block['texture_image_name'] = read_pascal_string(f).decode("ASCII")
-                texture_block['texture_slot'], texture_block['unk_01'], texture_block['unk_02'] = struct.unpack("<3I",f.read(12))
+                texture_block['texture_slot'], texture_block['unk_01'], texture_block['unk_02'] = struct.unpack("<3i",f.read(12))
+                if kuro_ver > 1:
+                    texture_block['unk_03'], texture_block['unk_04'] = struct.unpack("<2i",f.read(8))
                 material_block['textures'].append(texture_block)
             shader_element_count, = struct.unpack("<I",f.read(4))
             material_block['shaders'] = []
@@ -268,7 +342,7 @@ def obtain_material_data (material_section_bytes):
             for j in range(material_switch_count):
                 material_switch_block = {}
                 material_switch_block['material_switch_name'] = read_pascal_string(f).decode("ASCII")
-                material_switch_block['int2'], = struct.unpack("<I",f.read(4))
+                material_switch_block['int2'], = struct.unpack("<i",f.read(4))
                 material_block['material_switches'].append(material_switch_block)
             uv_map_index_count, = struct.unpack("<I",f.read(4))
             material_block['uv_map_indices'] = list(struct.unpack("{0}B".format(uv_map_index_count),f.read(uv_map_index_count)))
@@ -312,11 +386,9 @@ def process_mdl (mdl_file, complete_maps = False, trim_for_gpu = False, overwrit
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
     mdl_data = decryptCLE(mdl_data)
-    mesh_data = isolate_mesh_data(mdl_data)
-    mesh_struct = obtain_mesh_data(mesh_data, trim_for_gpu)
+    mesh_struct = obtain_mesh_data(mdl_data, trim_for_gpu = trim_for_gpu)
     mesh_json_filename = mdl_file[:-4] + '/mesh_info.json'
-    material_data = isolate_material_data(mdl_data)
-    material_struct = obtain_material_data(material_data)
+    material_struct = obtain_material_data(mdl_data)
     material_json_filename = mdl_file[:-4] + '/material_info.json'
     if os.path.exists(mdl_file[:-4]) and (os.path.isdir(mdl_file[:-4])) and (overwrite == False):
         if str(input(mdl_file[:-4] + " folder exists! Overwrite? (y/N) ")).lower()[0:1] == 'y':
