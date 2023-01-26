@@ -16,6 +16,9 @@ import io, struct, sys, os, glob, base64, json, blowfish, operator, zstandard
 from itertools import chain
 from lib_fmtibvb import *
 
+# This script outputs non-empty vgmaps by default, change the following line to True to change
+complete_vgmaps_default = False
+
 # Thank you to authors of Kuro Tools for this decrypt function
 # https://github.com/nnguyen259/KuroTools
 def decryptCLE(file_content):
@@ -381,7 +384,7 @@ def write_fmt_ib_vb (mesh_buffers, filename, node_list = False, complete_maps = 
             f.write(json.dumps(vgmap_json, indent=4).encode("utf-8"))
     return
 
-def process_mdl (mdl_file, complete_maps = False, trim_for_gpu = False, overwrite = False):
+def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu = False, overwrite = False):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
@@ -418,13 +421,20 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         import argparse
         parser = argparse.ArgumentParser()
-        parser.add_argument('-c', '--completemaps', help="Provide vgmaps with entire mesh skeleton", action="store_true")
+        if complete_vgmaps_default == True:
+            parser.add_argument('-p', '--partialmaps', help="Provide vgmaps with non-empty groups only", action="store_false")
+        else:
+            parser.add_argument('-c', '--completemaps', help="Provide vgmaps with entire mesh skeleton", action="store_true")
         parser.add_argument('-t', '--trim_for_gpu', help="Trim vertex buffer for GPU injection (3DMigoto)", action="store_true")
         parser.add_argument('-o', '--overwrite', help="Overwrite existing files", action="store_true")
         parser.add_argument('mdl_filename', help="Name of mdl file to export from (required).")
         args = parser.parse_args()
+        if complete_vgmaps_default == True:
+            complete_maps = args.partialmaps
+        else:
+            complete_maps = args.completemaps
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
-            process_mdl(args.mdl_filename, complete_maps = args.completemaps, trim_for_gpu = args.trim_for_gpu, overwrite = args.overwrite)
+            process_mdl(args.mdl_filename, complete_maps = complete_maps, trim_for_gpu = args.trim_for_gpu, overwrite = args.overwrite)
     else:
         mdl_files = glob.glob('*.mdl')
         for i in range(len(mdl_files)):
