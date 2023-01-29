@@ -21,6 +21,8 @@ def compressCLE(file_content):
     if not magic == compressed_magic: # Don't compress files that are already compressed:
         compressor = zstandard.ZstdCompressor(level = 12, write_checksum = True)
         result = compressor.compress(file_content)
+        while (len(result) % 8) > 0:
+            result += b'\x00'
         result = compressed_magic + struct.pack("<I", len(result)) + result
     return result
 

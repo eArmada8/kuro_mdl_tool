@@ -237,6 +237,9 @@ def obtain_mesh_data (mdl_data, trim_for_gpu = False):
                                 ib["Buffer"].append(triangle)
                                 triangle = []
                     else:
+                        # The next two lines makes the buffer fully compatible with lib_fmtibvb
+                        buffer["SemanticName"] = buffer["fmt"]["SemanticName"]
+                        buffer["SemanticIndex"] = buffer["fmt"]["SemanticIndex"]
                         # If Trim for GPU is on, discard texcoords above the 3rd, and the unknown buffers
                         if (trim_for_gpu == False) or (element_index < 3 and not element["type_int"] == 3):
                             aligned_byte_offset += element["stride"]
@@ -372,12 +375,13 @@ def make_fmt_struct (mesh_buffers):
     fmt_struct["elements"] = [x["fmt"] for x in mesh_buffers["vb"]]
     return(fmt_struct)
 
-def write_fmt_ib_vb (mesh_buffers, filename, node_list = False, complete_maps = False):
+def write_fmt_ib_vb (mesh_buffers, filename, node_list = False, complete_maps = False, write_empty_buffers = False):
     print("Processing submesh {0}...".format(filename))
     fmt_struct = make_fmt_struct(mesh_buffers)
     write_fmt(fmt_struct, filename + '.fmt')
-    write_ib(mesh_buffers['ib']['Buffer'], filename +  '.ib', fmt_struct)
-    write_vb(mesh_buffers['vb'], filename +  '.vb', fmt_struct)
+    if len(mesh_buffers['ib']['Buffer']) > 0 or write_empty_buffers == True:
+        write_ib(mesh_buffers['ib']['Buffer'], filename +  '.ib', fmt_struct)
+        write_vb(mesh_buffers['vb'], filename +  '.vb', fmt_struct)
     if not node_list == False:
         # Find vertex groups referenced by vertices so that we can cull the empty ones
         active_nodes = list(set(list(chain.from_iterable([x["Buffer"] for x in mesh_buffers["vb"] \

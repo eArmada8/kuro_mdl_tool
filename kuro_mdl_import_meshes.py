@@ -25,6 +25,8 @@ def compressCLE(file_content):
     if not magic == compressed_magic: # Don't compress files that are already compressed:
         compressor = zstandard.ZstdCompressor(level = 12, write_checksum = True)
         result = compressor.compress(file_content)
+        while (len(result) % 8) > 0:
+            result += b'\x00'
         result = compressed_magic + struct.pack("<I", len(result)) + result
     return result
 
@@ -64,8 +66,7 @@ def build_material_section (mdl_filename, kuro_ver = 1):
         with open(mdl_filename + '.mdl', "rb") as f:
             mdl_data = f.read()
         mdl_data = decryptCLE(mdl_data)
-        material_data = isolate_material_data(mdl_data)
-        material_struct = obtain_material_data(mesh_data)
+        material_struct = obtain_material_data(mdl_data)
     output_buffer = struct.pack("<I", len(material_struct))
     for i in range(len(material_struct)):
         material_block = make_pascal_string(material_struct[i]['material_name']) \
@@ -113,93 +114,106 @@ def build_material_section (mdl_filename, kuro_ver = 1):
     return(struct.pack("<2I", 0, len(output_buffer)) + output_buffer)
 
 def build_mesh_section (mdl_filename, kuro_ver = 1):
+    # Ordinarily we do not need to parse the original file, but in case we do, we only want to do it once
+    has_parsed_original_file = False
     try:
-        mesh_struct = read_struct_from_json(mdl_filename + "/mesh_info.json")
+        mesh_struct_metadata = read_struct_from_json(mdl_filename + "/mesh_info.json")
     except:
         with open(mdl_filename + '.mdl', "rb") as f:
             mdl_data = f.read()
         mdl_data = decryptCLE(mdl_data)
-        mesh_struct = obtain_mesh_data(mdl_data)["mesh_blocks"]
-    output_buffer = struct.pack("<I", len(mesh_struct))
+        mesh_struct = obtain_mesh_data(mdl_data)
+        has_parsed_original_file = True
+        mesh_struct_metadata = mesh_struct["mesh_blocks"]
+    output_buffer = struct.pack("<I", len(mesh_struct_metadata))
     if kuro_ver > 1:
         prim_output_header = bytes()
         prim_output_data = bytes()
         prim_buffer_count = 0
-    for i in range(len(mesh_struct)):
+    for i in range(len(mesh_struct_metadata)):
         mesh_block = bytes()
-        meshes = 0 # Keep count of actual meshes imported, in case some have been deleted
-        for j in range(len(mesh_struct[i]["primitives"])):
+        for j in range(len(mesh_struct_metadata[i]["primitives"])):
             try:
-                mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, mesh_struct[i]["name"], j)
+                mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, mesh_struct_metadata[i]["name"], j)
                 fmt = read_fmt(mesh_filename + '.fmt')
                 ib = list(chain.from_iterable(read_ib(mesh_filename + '.ib', fmt)))
                 vb = read_vb(mesh_filename + '.vb', fmt)
-                primitive_buffer = struct.pack("<I", mesh_struct[i]["primitives"][j]["material_offset"])
+            except FileNotFoundError:
+                print("Submesh {0} not found, generating an empty submesh...".format(mesh_filename))
+                if has_parsed_original_file == False:
+                    with open(mdl_filename + '.mdl', "rb") as f:
+                        mdl_data = f.read()
+                    mdl_data = decryptCLE(mdl_data)
+                    mesh_struct = obtain_mesh_data(mdl_data)
+                    has_parsed_original_file = True
+                # Generate an empty submesh
+                fmt = make_fmt_struct(mesh_struct["mesh_buffers"][i][j])
+                ib = []
+                vb = mesh_struct["mesh_buffers"][i][j]['vb']
+            print("Processing submesh {0}...".format(mesh_filename))
+            primitive_buffer = struct.pack("<I", mesh_struct_metadata[i]["primitives"][j]["material_offset"])
+            if kuro_ver == 1:
+                primitive_buffer += struct.pack("<I", len(vb)+1)
+            elif kuro_ver > 1:
+                primitive_buffer += struct.pack("<2I", len(ib), mesh_struct_metadata[i]["primitives"][j]["unk"])
+            for k in range(len(vb)):
+                match vb[k]["SemanticName"]:
+                    case "POSITION":
+                        type_int = 0
+                    case "NORMAL":
+                        type_int = 1
+                    case "TANGENT":
+                        type_int = 2
+                    case "UNKNOWN":
+                        type_int = 3
+                    case "TEXCOORD":
+                        type_int = 4
+                    case "BLENDWEIGHTS":
+                        type_int = 5
+                    case "BLENDINDICES":
+                        type_int = 6
+                dxgi_format = fmt["elements"][k]["Format"].split('DXGI_FORMAT_')[-1]
+                dxgi_format_split = dxgi_format.split('_')
+                vec_format = re.findall("[0-9]+",dxgi_format_split[0])
+                vec_elements = len(vec_format)
+                vec_stride = int(int(vec_format[0]) * len(vec_format) / 8)
+                match dxgi_format_split[1]:
+                    case "FLOAT":
+                        element_type = 'f'
+                    case "UINT":
+                        element_type = 'I' # Assuming 32-bit since Kuro models all use 32-bit
+                raw_buffer = struct.pack("<{0}{1}".format(vec_elements*len(vb[k]["Buffer"]), element_type), *list(chain.from_iterable(vb[k]["Buffer"])))
                 if kuro_ver == 1:
-                    primitive_buffer += struct.pack("<I", len(vb)+1)
+                    primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
                 elif kuro_ver > 1:
-                    primitive_buffer += struct.pack("<2I", len(ib), mesh_struct[i]["primitives"][j]["unk"])
-                for k in range(len(vb)):
-                    match vb[k]["SemanticName"]:
-                        case "POSITION":
-                            type_int = 0
-                        case "NORMAL":
-                            type_int = 1
-                        case "TANGENT":
-                            type_int = 2
-                        case "UNKNOWN":
-                            type_int = 3
-                        case "TEXCOORD":
-                            type_int = 4
-                        case "BLENDWEIGHTS":
-                            type_int = 5
-                        case "BLENDINDICES":
-                            type_int = 6
-                    dxgi_format = fmt["elements"][k]["Format"].split('DXGI_FORMAT_')[-1]
-                    dxgi_format_split = dxgi_format.split('_')
-                    vec_format = re.findall("[0-9]+",dxgi_format_split[0])
-                    vec_elements = len(vec_format)
-                    vec_stride = int(int(vec_format[0]) * len(vec_format) / 8)
-                    match dxgi_format_split[1]:
-                        case "FLOAT":
-                            element_type = 'f'
-                        case "UINT":
-                            element_type = 'I' # Assuming 32-bit since Kuro models all use 32-bit
-                    raw_buffer = struct.pack("<{0}{1}".format(vec_elements*len(vb[k]["Buffer"]), element_type), *list(chain.from_iterable(vb[k]["Buffer"])))
-                    if kuro_ver == 1:
-                        primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
-                    elif kuro_ver > 1:
-                        prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, j)
-                        prim_output_data += raw_buffer
-                        prim_buffer_count += 1
-                # After VB, need to add IB
-                # Making assumptions here that it will always be in Rxx_UINT format, saves a bunch of code
-                vec_stride = int(int(re.findall("[0-9]+",fmt["format"].split('DXGI_FORMAT_')[-1].split('_')[0])[0]) / 8)
-                raw_ibuffer = struct.pack("<{0}I".format(len(ib), element_type), *ib)
-                if kuro_ver == 1:
-                    primitive_buffer += struct.pack("<3I", 7, len(raw_ibuffer), vec_stride) + raw_ibuffer
-                elif kuro_ver > 1:
-                    prim_output_header += struct.pack("<5I", 7, len(raw_ibuffer), vec_stride, i, j)
-                    prim_output_data += raw_ibuffer
+                    prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, j)
+                    prim_output_data += raw_buffer
                     prim_buffer_count += 1
-                mesh_block += primitive_buffer
-                meshes += 1
-            except:
-                pass
-        mesh_block = struct.pack("<I", meshes) + mesh_block
-        if "nodes" in mesh_struct[i].keys():
-            node_count = len(mesh_struct[i]["nodes"])
+            # After VB, need to add IB
+            # Making assumptions here that it will always be in Rxx_UINT format, saves a bunch of code
+            vec_stride = int(int(re.findall("[0-9]+",fmt["format"].split('DXGI_FORMAT_')[-1].split('_')[0])[0]) / 8)
+            raw_ibuffer = struct.pack("<{0}I".format(len(ib), element_type), *ib)
+            if kuro_ver == 1:
+                primitive_buffer += struct.pack("<3I", 7, len(raw_ibuffer), vec_stride) + raw_ibuffer
+            elif kuro_ver > 1:
+                prim_output_header += struct.pack("<5I", 7, len(raw_ibuffer), vec_stride, i, j)
+                prim_output_data += raw_ibuffer
+                prim_buffer_count += 1
+            mesh_block += primitive_buffer
+        mesh_block = struct.pack("<I", len(mesh_struct_metadata[i]["primitives"])) + mesh_block
+        if "nodes" in mesh_struct_metadata[i].keys():
+            node_count = len(mesh_struct_metadata[i]["nodes"])
         else:
             node_count = 0
         node_block = struct.pack("<I", node_count)
         if node_count > 0:
             for j in range(node_count):
-                node_block += make_pascal_string(mesh_struct[i]["nodes"][j]["name"])
-                node_block += struct.pack("<16f", *list(chain.from_iterable(mesh_struct[i]["nodes"][j]["matrix"])))
+                node_block += make_pascal_string(mesh_struct_metadata[i]["nodes"][j]["name"])
+                node_block += struct.pack("<16f", *list(chain.from_iterable(mesh_struct_metadata[i]["nodes"][j]["matrix"])))
         mesh_block += node_block
-        raw_section2 = struct.pack("<3fI3f4I", *mesh_struct[i]["section2"]["data"])
+        raw_section2 = struct.pack("<3fI3f4I", *mesh_struct_metadata[i]["section2"]["data"])
         section2_block = struct.pack("<I", len(raw_section2)) + raw_section2
-        mesh_block = make_pascal_string(mesh_struct[i]["name"]) + struct.pack("<I", len(mesh_block)) + mesh_block + section2_block
+        mesh_block = make_pascal_string(mesh_struct_metadata[i]["name"]) + struct.pack("<I", len(mesh_block)) + mesh_block + section2_block
         output_buffer += mesh_block
         mesh_section_buffer = struct.pack("<2I", 1, len(output_buffer)) + output_buffer
         primitive_section_buffer = bytes()
