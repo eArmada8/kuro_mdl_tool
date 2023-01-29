@@ -12,7 +12,7 @@ I am very thankful for uyjulian, TwnKey, DarkStarSword, the KuroTools team and t
 
 ## Requirements:
 1. Python 3.10 and newer is required for use of these scripts.  It is free from the Microsoft Store, for Windows users.  For Linux users, please consult your distro.
-2. The blowfish and zstandard modules for python are needed.  Install by typing "python3 -m pip install blowfish zstandard" in the command line / shell.  (The io, re, struct, sys, os, shutil, glob, base64, json, operator, argparse and itertools modules are also required, but these are all already included in most basic python installations.)
+2. The blowfish, zstandard, pyquaternion and numpy modules for python are needed.  Install by typing "python3 -m pip install blowfish zstandard pyquaternion" in the command line / shell.  (The io, re, struct, sys, os, shutil, glob, base64, json, operator, argparse and itertools modules are also required, but these are all already included in most basic python installations.)
 3. The output can be imported into Blender using DarkStarSword's amazing plugin: https://github.com/DarkStarSword/3d-fixes/blob/master/blender_3dmigoto.py
 4. kuro_mdl_export_meshes.py is dependent on lib_fmtibvb.py, which must be in the same folder.  
 kuro_mdl_import_meshes.py is dependent on both kuro_mdl_export_meshes.py and lib_fmtibvb.py.
