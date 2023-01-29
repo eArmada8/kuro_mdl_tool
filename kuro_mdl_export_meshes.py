@@ -319,9 +319,12 @@ def obtain_material_data (mdl_data):
             for j in range(texture_element_count):
                 texture_block = {}
                 texture_block['texture_image_name'] = read_pascal_string(f).decode("ASCII")
-                texture_block['texture_slot'], texture_block['unk_01'], texture_block['unk_02'] = struct.unpack("<3i",f.read(12))
+                texture_block['texture_slot'], = struct.unpack("<i",f.read(4))
                 if kuro_ver > 1:
-                    texture_block['unk_03'], texture_block['unk_04'] = struct.unpack("<2i",f.read(8))
+                    texture_block['unk_00'], = struct.unpack("<i",f.read(4))
+                texture_block['unk_01'], texture_block['unk_02'] = struct.unpack("<2i",f.read(8))
+                if kuro_ver > 1:
+                    texture_block['unk_03'], = struct.unpack("<i",f.read(4))
                 material_block['textures'].append(texture_block)
             shader_element_count, = struct.unpack("<I",f.read(4))
             material_block['shaders'] = []

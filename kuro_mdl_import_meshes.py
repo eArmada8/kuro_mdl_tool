@@ -34,9 +34,15 @@ def make_pascal_string(string):
     return struct.pack("<B", len(string)) + string.encode("utf8")
 
 # Primitive data is in Kuro 2.  In Kuro 1, it will be an empty buffer.
-def insert_model_data (mdl_data, material_section_data, mesh_section_data, primitive_section_data):
+# force_kuro_version should be either set to False, or to an integer.
+def insert_model_data (mdl_data, material_section_data, mesh_section_data, primitive_section_data, force_kuro_version = False):
     with io.BytesIO(mdl_data) as f:
-        new_mdl_data = f.read(12) #Header
+        new_mdl_data = f.read(4) #Header
+        kuro_ver, = struct.unpack("<I", f.read(4))
+        if force_kuro_version != False and force_kuro_version < kuro_ver:
+            kuro_ver = force_kuro_version
+        new_mdl_data += struct.pack("<I", kuro_ver)
+        new_mdl_data += f.read(4) #Not sure what this is in the header
         while True:
             current_offset = f.tell()
             section = f.read(8)
@@ -51,7 +57,10 @@ def insert_model_data (mdl_data, material_section_data, mesh_section_data, primi
             if section_info["type"] == 1: # Mesh section to replace
                 section = mesh_section_data
             if section_info["type"] == 4: # Primitive section to replace
-                section = primitive_section_data
+                if kuro_ver > 1:
+                    section = primitive_section_data
+                else: # Needed if we are forcing downgrade to version 1
+                    section = b''
             new_mdl_data += section
         # Catch the null bytes at the end of the stream
         f.seek(current_offset,0)
@@ -76,11 +85,12 @@ def build_material_section (mdl_filename, kuro_ver = 1):
         texture_block_count = 0
         for j in range(len(material_struct[i]['textures'])):
             texture_blocks += make_pascal_string(material_struct[i]['textures'][j]['texture_image_name']) \
-                + struct.pack("<3i", material_struct[i]['textures'][j]['texture_slot'],\
-                material_struct[i]['textures'][j]['unk_01'], material_struct[i]['textures'][j]['unk_02'])
+                + struct.pack("<i", material_struct[i]['textures'][j]['texture_slot'])
             if kuro_ver > 1:
-                texture_blocks += struct.pack("<2i", material_struct[i]['textures'][j]['unk_03'],\
-                    material_struct[i]['textures'][j]['unk_04'])
+                texture_blocks += struct.pack("<i", material_struct[i]['textures'][j]['unk_00'])
+            texture_blocks += struct.pack("<2i", material_struct[i]['textures'][j]['unk_01'], material_struct[i]['textures'][j]['unk_02'])
+            if kuro_ver > 1:
+                texture_blocks += struct.pack("<i", material_struct[i]['textures'][j]['unk_03'])
             texture_block_count += 1
         material_block += struct.pack("<I", texture_block_count) + texture_blocks
         shader_elements = bytes()
@@ -222,15 +232,17 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
             primitive_section_buffer += struct.pack("<2I", 4, len(primitive_output_buffer)) + primitive_output_buffer
     return(mesh_section_buffer, primitive_section_buffer)
 
-def process_mdl (mdl_file, compress = True):
+def process_mdl (mdl_file, compress = True, force_kuro_version = False):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
     mdl_data = decryptCLE(mdl_data)
     kuro_ver = get_kuro_ver(mdl_data)
+    if force_kuro_version != False and force_kuro_version < kuro_ver:
+        kuro_ver = force_kuro_version
     material_data = build_material_section(mdl_file[:-4], kuro_ver = kuro_ver)
     mesh_data, primitive_data = build_mesh_section(mdl_file[:-4], kuro_ver = kuro_ver)
-    new_mdl_data = insert_model_data(mdl_data, material_data, mesh_data, primitive_data)
+    new_mdl_data = insert_model_data(mdl_data, material_data, mesh_data, primitive_data, force_kuro_version = force_kuro_version)
     # Instead of overwriting backups, it will just tag a number onto the end
     backup_suffix = ''
     if os.path.exists(mdl_file + '.bak' + backup_suffix):
@@ -254,11 +266,12 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         import argparse
         parser = argparse.ArgumentParser()
+        parser.add_argument('-f', '--force_version', help="Force compile at a specific Kuro version (must be equal or lower to original)", type=int, choices=range(1,3))
         parser.add_argument('-u', '--uncompressed', help="Do not apply zstandard compression", action="store_false")
         parser.add_argument('mdl_filename', help="Name of mdl file to import into (required).")
         args = parser.parse_args()
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
-            process_mdl(args.mdl_filename, compress = args.uncompressed)
+            process_mdl(args.mdl_filename, compress = args.uncompressed, force_kuro_version = args.force_version)
     else:
         mdl_files = glob.glob('*.mdl')
         mdl_files = [x for x in mdl_files if os.path.isdir(x[:-4])]
