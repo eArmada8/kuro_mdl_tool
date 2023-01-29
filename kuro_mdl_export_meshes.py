@@ -327,12 +327,18 @@ def obtain_material_data (mdl_data):
                 shader_block['shader_name'] = read_pascal_string(f).decode("ASCII")
                 shader_block['type_int'], = struct.unpack("<I",f.read(4))
                 match shader_block['type_int']:
-                    case 0 | 1 | 4:
-                        shader_block['data_base64'] = base64.b64encode(f.read(4)).decode()
-                    case 2 | 5:
+                    case 0 | 1:
+                        shader_block['data'], = struct.unpack("<I",f.read(4))
+                    case 2:
                         shader_block['data_base64'] = base64.b64encode(f.read(8)).decode()
-                    case 3 | 6:
+                    case 3:
                         shader_block['data_base64'] = base64.b64encode(f.read(12)).decode()
+                    case 4:
+                        shader_block['data'], = struct.unpack("<f",f.read(4))
+                    case 5:
+                        shader_block['data'] = list(struct.unpack("<2f",f.read(8)))
+                    case 6:
+                        shader_block['data'] = list(struct.unpack("<3f",f.read(12)))
                     case 7:
                         shader_block['data_base64'] = base64.b64encode(f.read(16)).decode()
                     case 8:

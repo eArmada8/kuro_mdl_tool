@@ -85,9 +85,18 @@ def build_material_section (mdl_filename, kuro_ver = 1):
         shader_elements = bytes()
         shader_element_count = 0
         for j in range(len(material_struct[i]['shaders'])):
-            shader_elements += make_pascal_string(material_struct[i]['shaders'][j]['shader_name']) \
-                + struct.pack("<I", material_struct[i]['shaders'][j]['type_int']) \
-                + base64.b64decode(material_struct[i]['shaders'][j]['data_base64'])
+            if material_struct[i]['shaders'][j]['type_int'] in [0,1,4,5,6]: # These are decoded, so need to be encoded
+                struct_dict = {0: "<I", 1: "<I", 4: "<f", 5: "<2f", 6: "<3f"}
+                shader_elements += make_pascal_string(material_struct[i]['shaders'][j]['shader_name']) \
+                    + struct.pack("<I", material_struct[i]['shaders'][j]['type_int'])
+                if type(material_struct[i]['shaders'][j]['data']) == list:
+                    shader_elements += struct.pack(struct_dict[material_struct[i]['shaders'][j]['type_int']], *material_struct[i]['shaders'][j]['data'])
+                else:
+                    shader_elements += struct.pack(struct_dict[material_struct[i]['shaders'][j]['type_int']], material_struct[i]['shaders'][j]['data'])
+            else:
+                shader_elements += make_pascal_string(material_struct[i]['shaders'][j]['shader_name']) \
+                    + struct.pack("<I", material_struct[i]['shaders'][j]['type_int']) \
+                    + base64.b64decode(material_struct[i]['shaders'][j]['data_base64'])
             shader_element_count += 1
         material_block += struct.pack("<I", shader_element_count) + shader_elements
         material_switches = bytes()
