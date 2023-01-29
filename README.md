@@ -19,7 +19,7 @@ kuro_mdl_import_meshes.py is dependent on both kuro_mdl_export_meshes.py and lib
 
 ## Usage:
 ### kuro_mdl_export_meshes.py
-Double click the python script and it will search the current folder for all .mdl files and export the meshes into a folder with the same name as the mdl file.  Additionally, it will output 2 JSON files, one with metadata from the mesh section, and another with the data from the materials section.
+Double click the python script and it will search the current folder for all .mdl files and export the meshes into a folder with the same name as the mdl file.  Additionally, it will output 3 JSON files, one with metadata from the mesh section, another with the data from the materials section, and a third with the MDL version.
 
 **Command line arguments:**
 `kuro_mdl_export_meshes.py [-h] [-c] [-t] [-o] mdl_filename`
@@ -44,7 +44,7 @@ which you can change to
 This will also change the command line argument `-c, --completemaps` into `-p, --partialmaps` which you would call to enable non-empty group vgmaps instead.
 
 ### kuro_mdl_import_meshes.py
-Double click the python script and it will search the current folder for all .mdl files with exported folders, and import the meshes in the folder back into the mdl file.  Additionally, it will parse the 2 JSON files (mesh metadata and materials) if available and use that information to rebuild the mesh and materials sections.  This script requires a working mdl file already be present as it does not reconstruct the entire file; only the known relevant sections.  The remaining parts of the file (bone heirarchy, any animation data, etc) are copied unaltered from the intact mdl file.  By default, it will apply zstandard compression to the final file.
+Double click the python script and it will search the current folder for all .mdl files with exported folders, and import the meshes in the folder back into the mdl file.  Additionally, it will parse the 3 JSON files (mesh metadata, materials and MDL version) if available and use that information to rebuild the mesh and materials sections.  This script requires a working mdl file already be present as it does not reconstruct the entire file; only the known relevant sections.  The remaining parts of the file (bone heirarchy, any animation data, etc) are copied unaltered from the intact mdl file.  By default, it will apply zstandard compression to the final file.
 
 It will make a backup of the original, then overwrite the original.  It will not overwrite backups; for example if "model.mdl.bak" already exists, then it will write the backup to "model.mdl.bak1", then to "model.mdl.bak2", and so on.
 

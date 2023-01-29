@@ -406,12 +406,15 @@ def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu
     mesh_json_filename = mdl_file[:-4] + '/mesh_info.json'
     material_struct = obtain_material_data(mdl_data)
     material_json_filename = mdl_file[:-4] + '/material_info.json'
+    mdl_version_json_filename = mdl_file[:-4] + '/mdl_version.json'
     if os.path.exists(mdl_file[:-4]) and (os.path.isdir(mdl_file[:-4])) and (overwrite == False):
         if str(input(mdl_file[:-4] + " folder exists! Overwrite? (y/N) ")).lower()[0:1] == 'y':
             overwrite = True
     if (overwrite == True) or not os.path.exists(mdl_file[:-4]):
         if not os.path.exists(mdl_file[:-4]):
             os.mkdir(mdl_file[:-4])
+        with open(mdl_version_json_filename, 'wb') as f:
+            f.write(json.dumps({'mdl_version': get_kuro_ver(mdl_data)}, indent=4).encode("utf-8"))
         with open(mesh_json_filename, 'wb') as f:
             f.write(json.dumps(mesh_struct["mesh_blocks"], indent=4).encode("utf-8"))
         with open(material_json_filename, 'wb') as f:

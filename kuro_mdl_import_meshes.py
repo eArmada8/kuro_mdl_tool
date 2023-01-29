@@ -238,6 +238,13 @@ def process_mdl (mdl_file, compress = True, force_kuro_version = False):
     print("Processing {0}...".format(mdl_file))
     mdl_data = decryptCLE(mdl_data)
     kuro_ver = get_kuro_ver(mdl_data)
+    try: # Attempt to get MDL version from JSON file, if this fails just use version number embedded in MDL
+        json_kuro_ver = read_struct_from_json(mdl_file[:-4] + '/mdl_version.json')['mdl_version']
+        if json_kuro_ver > 0 and json_kuro_ver <= kuro_ver:
+            kuro_ver = json_kuro_ver
+    except:
+        pass
+    # Command line option overrides JSON file
     if force_kuro_version != False and force_kuro_version < kuro_ver:
         kuro_ver = force_kuro_version
     material_data = build_material_section(mdl_file[:-4], kuro_ver = kuro_ver)
