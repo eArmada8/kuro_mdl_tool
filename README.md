@@ -54,8 +54,11 @@ It will make a backup of the original, then overwrite the original.  It will not
 `-h, --help`
 Shows help message.
 
+`-f {1,2}, --force_version {1,2}`
+This option will tell the importer to force compile the MDL at a specific Kuro version.  At this time, it only supports downgrading Kuro 2 MDLs to Kuro 1.  Hopefully in the future we will know enough about the new version to allow upgrading as well.
+
 `-u, --uncompressed`
-Do not apply zstandard compression.
+Do not apply zstandard compression.  Not really needed as both Kuro 1 and 2 support compressed MDLs.
 
 ### kuro_mdl_to_basic_gltf.py
 Double click the python script to run and it will attempt to convert the MDL model into a basic glTF model, with skeleton.  This tool as written is for obtaining the skeleton for rigging the .fmt/.ib/.vb/.vgmap meshes from the export tool.  *The meshes included in the model are not particularly useful as they cannot be exported back to MDL,* just delete them and import the exported meshes (.fmt/.ib/.vb./vgmap) instead - the tool only includes meshes because Blender refuses to open a glTF file without meshes.  After importing the meshes, Ctrl-click on the armature and parent (Object -> Parent -> Armature Deform {without the extra options}).

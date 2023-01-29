@@ -266,7 +266,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         import argparse
         parser = argparse.ArgumentParser()
-        parser.add_argument('-f', '--force_version', help="Force compile at a specific Kuro version (must be equal or lower to original)", type=int, choices=range(1,3))
+        parser.add_argument('-f', '--force_version', help="Force compile at a specific Kuro version (must be equal to or lower than original)", type=int, choices=range(1,3))
         parser.add_argument('-u', '--uncompressed', help="Do not apply zstandard compression", action="store_false")
         parser.add_argument('mdl_filename', help="Name of mdl file to import into (required).")
         args = parser.parse_args()
