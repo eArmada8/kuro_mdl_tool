@@ -277,8 +277,12 @@ if __name__ == "__main__":
         parser.add_argument('-u', '--uncompressed', help="Do not apply zstandard compression", action="store_false")
         parser.add_argument('mdl_filename', help="Name of mdl file to import into (required).")
         args = parser.parse_args()
+        if args.force_version == None:
+            force_kuro_version = False
+        else:
+            force_kuro_version = args.force_version
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
-            process_mdl(args.mdl_filename, compress = args.uncompressed, force_kuro_version = args.force_version)
+            process_mdl(args.mdl_filename, compress = args.uncompressed, force_kuro_version = force_kuro_version)
     else:
         mdl_files = glob.glob('*.mdl')
         mdl_files = [x for x in mdl_files if os.path.isdir(x[:-4])]
