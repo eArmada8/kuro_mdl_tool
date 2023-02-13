@@ -195,7 +195,7 @@ def obtain_mesh_data (mdl_data, trim_for_gpu = False):
                     buffer_data = []
                     match element_type:
                         case 'f': #32-bit FLOAT
-                            format_colors = ['R32','B32','G32','A32','D32']
+                            format_colors = ['R32','G32','B32','A32','D32']
                             for l in range(element["count"]):
                                 if kuro_ver == 1:
                                     buffer_data.append(struct.unpack("<{0}f".format(int(element["stride"]/4)), f.read(element["stride"])))
@@ -203,7 +203,7 @@ def obtain_mesh_data (mdl_data, trim_for_gpu = False):
                                     buffer_data.append(struct.unpack("<{0}f".format(int(element["stride"]/4)), prim.read(element["stride"])))
                                 format_string = "".join(format_colors[0:int(element["stride"]/4)]) + "_FLOAT"
                         case 'I': #32-bit UINT
-                            format_colors = ['R32','B32','G32','A32','D32']
+                            format_colors = ['R32','G32','B32','A32','D32']
                             for l in range(element["count"]):
                                 if kuro_ver == 1:
                                     buffer_data.append(struct.unpack("<{0}I".format(int(element["stride"]/4)), f.read(element["stride"])))
@@ -211,7 +211,7 @@ def obtain_mesh_data (mdl_data, trim_for_gpu = False):
                                     buffer_data.append(struct.unpack("<{0}I".format(int(element["stride"]/4)), prim.read(element["stride"])))
                                 format_string = "".join(format_colors[0:int(element["stride"]/4)]) + "_UINT"
                         case 'H': #16-bit UINT, not sure this is used by Kuro at all
-                            format_colors = ['R16','B16','G16','A16','D16']
+                            format_colors = ['R16','G16','B16','A16','D16']
                             for l in range(element["count"]):
                                 if kuro_ver == 1:
                                     buffer_data.append(struct.unpack("<{0}H".format(int(element["stride"]/2)), f.read(element["stride"])))
@@ -219,7 +219,7 @@ def obtain_mesh_data (mdl_data, trim_for_gpu = False):
                                     buffer_data.append(struct.unpack("<{0}H".format(int(element["stride"]/2)), prim.read(element["stride"])))
                                 format_string = "".join(format_colors[0:int(element["stride"]/2)]) + "_UINT"
                         case 'U': #8-bit UNORM
-                            format_colors = ['R8','B8','G8','A8']
+                            format_colors = ['B8','G8','R8','A8'] # Dunno why Kuro 2 has this reversed...  This isn't used in Kuro 1, so will not test version for now
                             float_max = ((2**8)-1) #Assuming all UNORM is 8-bit
                             for l in range(element["count"]):
                                 if kuro_ver == 1:

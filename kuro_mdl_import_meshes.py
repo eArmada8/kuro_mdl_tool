@@ -170,8 +170,10 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                 dxgi_format_split = dxgi_format.split('_')
                 vec_type = dxgi_format_split[1]
                 vec_format = re.findall("[0-9]+",dxgi_format_split[0])
+                vec_first_color = dxgi_format_split[0][0] # Should be R in most cases, but will be B if format is B8G8R8A8_UNORM
                 vec_elements = len(vec_format)
                 vec_stride = int(int(vec_format[0]) * vec_elements / 8)
+                reverse_colors = False # COLOR is BGR in Kuro 2
                 match vb[k]["SemanticName"]:
                     case "POSITION":
                         type_int = 0
@@ -182,9 +184,13 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                     case "COLOR":
                         type_int = 3
                         if kuro_ver == 1: # Forcing 32-bit float since Kuro 1 uses float
+                            if vec_first_color == 'B':
+                                reverse_colors = True
                             vec_type = 'FLOAT'
                             vec_stride = 4 * vec_elements
                         elif kuro_ver == 2: # Forcing 8-bit unorm since Kuro 2 models use 8-bit UNORM
+                            if vec_first_color == 'R':
+                                reverse_colors = True
                             vec_type = 'UNORM'
                             vec_stride = vec_elements
                     case "TEXCOORD":
@@ -193,18 +199,22 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                         type_int = 5
                     case "BLENDINDICES":
                         type_int = 6
+                if reverse_colors == True and vec_elements == 4: # vec_elements should ALWAYS be 4 with COLOR, but just in case
+                    current_buffer = [[x[2],x[1],x[0],x[3]] for x in vb[k]["Buffer"]]
+                else:
+                    current_buffer = vb[k]["Buffer"]
                 match vec_type:
                     case "FLOAT":
                         element_type = 'f'
-                        data_list = list(chain.from_iterable(vb[k]["Buffer"]))
+                        data_list = list(chain.from_iterable(current_buffer))
                     case "UINT":
                         element_type = 'I' # Assuming 32-bit since Kuro models all use 32-bit
-                        data_list = list(chain.from_iterable(vb[k]["Buffer"]))
+                        data_list = list(chain.from_iterable(current_buffer))
                     case "UNORM":
                         element_type = 'B'
                         float_max = ((2**8)-1)
-                        data_list = [int(round(min(max(x,0), 1) * float_max)) for x in list(chain.from_iterable(vb[k]["Buffer"]))]
-                raw_buffer = struct.pack("<{0}{1}".format(vec_elements*len(vb[k]["Buffer"]), element_type), *data_list)
+                        data_list = [int(round(min(max(x,0), 1) * float_max)) for x in list(chain.from_iterable(current_buffer))]
+                raw_buffer = struct.pack("<{0}{1}".format(len(data_list), element_type), *data_list)
                 if kuro_ver == 1:
                     primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
                 elif kuro_ver > 1:
