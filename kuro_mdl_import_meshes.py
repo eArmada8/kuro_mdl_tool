@@ -35,12 +35,11 @@ def make_pascal_string(string):
 
 # Primitive data is in Kuro 2.  In Kuro 1, it will be an empty buffer.
 # force_kuro_version should be either set to False, or to an integer.
-def insert_model_data (mdl_data, material_section_data, mesh_section_data, primitive_section_data, force_kuro_version = False):
+def insert_model_data (mdl_data, material_section_data, mesh_section_data, primitive_section_data, kuro_ver):
     with io.BytesIO(mdl_data) as f:
         new_mdl_data = f.read(4) #Header
-        kuro_ver, = struct.unpack("<I", f.read(4))
-        if force_kuro_version != False and force_kuro_version < kuro_ver:
-            kuro_ver = force_kuro_version
+        orig_kuro_ver, = struct.unpack("<I", f.read(4))
+        kuro_ver = min(kuro_ver, orig_kuro_ver)
         new_mdl_data += struct.pack("<I", kuro_ver)
         new_mdl_data += f.read(4) #Not sure what this is in the header
         while True:
@@ -167,6 +166,12 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
             elif kuro_ver > 1:
                 primitive_buffer += struct.pack("<2I", len(ib), mesh_struct_metadata[i]["primitives"][j]["unk"])
             for k in range(len(vb)):
+                dxgi_format = fmt["elements"][k]["Format"].split('DXGI_FORMAT_')[-1]
+                dxgi_format_split = dxgi_format.split('_')
+                vec_type = dxgi_format_split[1]
+                vec_format = re.findall("[0-9]+",dxgi_format_split[0])
+                vec_elements = len(vec_format)
+                vec_stride = int(int(vec_format[0]) * vec_elements / 8)
                 match vb[k]["SemanticName"]:
                     case "POSITION":
                         type_int = 0
@@ -176,27 +181,27 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                         type_int = 2
                     case "COLOR":
                         type_int = 3
+                        if kuro_ver == 1: # Forcing 32-bit float since Kuro 1 uses float
+                            vec_type = 'FLOAT'
+                            vec_stride = 4 * vec_elements
+                        elif kuro_ver == 2: # Forcing 8-bit unorm since Kuro 2 models use 8-bit UNORM
+                            vec_type = 'UNORM'
+                            vec_stride = vec_elements
                     case "TEXCOORD":
                         type_int = 4
                     case "BLENDWEIGHTS":
                         type_int = 5
                     case "BLENDINDICES":
                         type_int = 6
-                dxgi_format = fmt["elements"][k]["Format"].split('DXGI_FORMAT_')[-1]
-                dxgi_format_split = dxgi_format.split('_')
-                vec_format = re.findall("[0-9]+",dxgi_format_split[0])
-                vec_elements = len(vec_format)
-                vec_stride = int(int(vec_format[0]) * len(vec_format) / 8)
-                match dxgi_format_split[1]:
+                match vec_type:
                     case "FLOAT":
                         element_type = 'f'
                         data_list = list(chain.from_iterable(vb[k]["Buffer"]))
                     case "UINT":
                         element_type = 'I' # Assuming 32-bit since Kuro models all use 32-bit
-                raw_buffer = struct.pack("<{0}{1}".format(vec_elements*len(vb[k]["Buffer"]), element_type), *list(chain.from_iterable(vb[k]["Buffer"])))
                         data_list = list(chain.from_iterable(vb[k]["Buffer"]))
                     case "UNORM":
-                        element_type = 'B' # Assuming 8-bit since Kuro models all use 8-bit
+                        element_type = 'B'
                         float_max = ((2**8)-1)
                         data_list = [int(round(min(max(x,0), 1) * float_max)) for x in list(chain.from_iterable(vb[k]["Buffer"]))]
                 raw_buffer = struct.pack("<{0}{1}".format(vec_elements*len(vb[k]["Buffer"]), element_type), *data_list)
@@ -254,9 +259,9 @@ def process_mdl (mdl_file, compress = True, force_kuro_version = False):
     # Command line option overrides JSON file
     if force_kuro_version != False and force_kuro_version < kuro_ver:
         kuro_ver = force_kuro_version
-    material_data = build_material_section(mdl_file[:-4], kuro_ver = kuro_ver)
-    mesh_data, primitive_data = build_mesh_section(mdl_file[:-4], kuro_ver = kuro_ver)
-    new_mdl_data = insert_model_data(mdl_data, material_data, mesh_data, primitive_data, force_kuro_version = force_kuro_version)
+    material_data = build_material_section(mdl_file[:-4], kuro_ver)
+    mesh_data, primitive_data = build_mesh_section(mdl_file[:-4], kuro_ver)
+    new_mdl_data = insert_model_data(mdl_data, material_data, mesh_data, primitive_data, kuro_ver)
     # Instead of overwriting backups, it will just tag a number onto the end
     backup_suffix = ''
     if os.path.exists(mdl_file + '.bak' + backup_suffix):

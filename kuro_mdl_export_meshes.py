@@ -172,7 +172,10 @@ def obtain_mesh_data (mdl_data, trim_for_gpu = False):
                             element_type = 'f'
                         case 3:
                             element["Semantic"] = "COLOR"
-                            element_type = 'U'
+                            if element["stride"] == 4:
+                                element_type = 'U'
+                            else:
+                                element_type = 'f'
                         case 4:
                             element["Semantic"] = "TEXCOORD"
                             element_type = 'f'
