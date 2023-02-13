@@ -174,7 +174,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                         type_int = 1
                     case "TANGENT":
                         type_int = 2
-                    case "UNKNOWN":
+                    case "COLOR":
                         type_int = 3
                     case "TEXCOORD":
                         type_int = 4
@@ -190,9 +190,16 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                 match dxgi_format_split[1]:
                     case "FLOAT":
                         element_type = 'f'
+                        data_list = list(chain.from_iterable(vb[k]["Buffer"]))
                     case "UINT":
                         element_type = 'I' # Assuming 32-bit since Kuro models all use 32-bit
                 raw_buffer = struct.pack("<{0}{1}".format(vec_elements*len(vb[k]["Buffer"]), element_type), *list(chain.from_iterable(vb[k]["Buffer"])))
+                        data_list = list(chain.from_iterable(vb[k]["Buffer"]))
+                    case "UNORM":
+                        element_type = 'B' # Assuming 8-bit since Kuro models all use 8-bit
+                        float_max = ((2**8)-1)
+                        data_list = [int(round(min(max(x,0), 1) * float_max)) for x in list(chain.from_iterable(vb[k]["Buffer"]))]
+                raw_buffer = struct.pack("<{0}{1}".format(vec_elements*len(vb[k]["Buffer"]), element_type), *data_list)
                 if kuro_ver == 1:
                     primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
                 elif kuro_ver > 1:

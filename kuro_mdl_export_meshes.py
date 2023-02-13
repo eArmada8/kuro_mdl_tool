@@ -171,8 +171,8 @@ def obtain_mesh_data (mdl_data, trim_for_gpu = False):
                             element["Semantic"] = "TANGENT"
                             element_type = 'f'
                         case 3:
-                            element["Semantic"] = "UNKNOWN" # Seemingly unused, assets load fine without it
-                            element_type = 'f'
+                            element["Semantic"] = "COLOR"
+                            element_type = 'U'
                         case 4:
                             element["Semantic"] = "TEXCOORD"
                             element_type = 'f'
@@ -215,6 +215,15 @@ def obtain_mesh_data (mdl_data, trim_for_gpu = False):
                                 elif kuro_ver > 1:
                                     buffer_data.append(struct.unpack("<{0}H".format(int(element["stride"]/2)), prim.read(element["stride"])))
                                 format_string = "".join(format_colors[0:int(element["stride"]/2)]) + "_UINT"
+                        case 'U': #8-bit UNORM
+                            format_colors = ['R8','B8','G8','A8']
+                            float_max = ((2**8)-1) #Assuming all UNORM is 8-bit
+                            for l in range(element["count"]):
+                                if kuro_ver == 1:
+                                    buffer_data.append([x / float_max for x in struct.unpack("<{0}B".format(int(element["stride"])), f.read(element["stride"]))])
+                                elif kuro_ver > 1:
+                                    buffer_data.append([x / float_max for x in struct.unpack("<{0}B".format(int(element["stride"])), prim.read(element["stride"]))])
+                                format_string = "".join(format_colors[0:int(element["stride"])]) + "_UNORM"
                     buffer["fmt"] = {"id": str(element_num),
                         "SemanticName": element["Semantic"],\
                         "SemanticIndex": str(element_index),\
