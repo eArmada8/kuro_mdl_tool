@@ -37,6 +37,7 @@ Trim vertex buffer for GPU injection (3DMigoto).  Meshes in the MDL contain have
 Overwrite existing files without prompting.
 
 **Complete VGMap Setting:**
+
 Many modders prefer that complete VGmaps is the default, rather than a command line option.  You can (permanently) change the default behavior by editing the python script itself.  There is a line at the top:
 `complete_vgmaps_default = True`
 which you can change to 
@@ -62,6 +63,7 @@ This option will tell the importer to force compile the MDL at a specific Kuro v
 Do not apply zstandard compression.  Not really needed as both Kuro 1 and 2 support compressed MDLs.
 
 **Adding and deleting meshes**
+
 If meshes are missing (.fmt/.ib/.vb files that have been deleted), then the script will insert an empty (invisible) mesh in its place.  Metadata does not need to be altered.
 
 The script only looks for mesh files that are listed in the JSON file.  If you want to add a new mesh, you will need to add metadata.  My script only reads the "material_offset" entry, everything else is automatically generated.  So a section added to the end of the "primitives" section like this will be sufficient:
@@ -73,6 +75,7 @@ The script only looks for mesh files that are listed in the JSON file.  If you w
 Be sure to add a comma to the } for the section prior if you are using a text editor, or better yet use a dedicated JSON editor.  I actually recommend editing JSON in a dedicated editor, because python is not forgiving if you make mistakes with the JSON structure.  (Try https://jsoneditoronline.org)  Also, be sure to point material_offset to a real section in material_info.json.  You might want to create a new section, or use an existing one.
 
 **Changing textures**
+
 First look inside mesh_info.json and find the mesh you want to edit.  Identify the group, then look inside primitives.  For example, if you want to edit the metadata for "2_woman01_body79_05.vb" then it will be inside group 2 (which is the 3rd group, 0 is the first), named "woman01_body79."  Inside "primitives" you will find mesh 5 (which is the 6th mesh, 0 is the first).  It will say "id_referenceonly": "5".  Under id_referenceonly is material_offset.  That is the material group you need to alter.
 
 Go to material_info.json, and go that section.  For example, if "material_offset" in mesh_info was 7, then go to section 7 (id_referenceonly will be 7).  Under textures, you can change the file names.  When changing the texture filenames, do not put ".dds".
@@ -83,6 +86,7 @@ Go to material_info.json, and go that section.  For example, if "material_offset
 - The textures that come with the CLE release are compressed.  Use cle_decrypt_decompress.py.  Kuro 1 will read uncompressed dds files; Kuro 2 will crash with uncompressed dds files.  Use cle_compress.py to compress the texture files before use.
 
 **Changing shaders**
+
 Please see the instructions above for changing textures.  I have successfully changed a shader by copying material_name, shader_name, the entire shaders section, and the entire material_switches section from one section to the other.  I am not sure you need to copy all of these, but I have not tested enough.  Maybe it is enough to just add switches that you need (such as "SWITCH_ALPHATEST" to enable alpha) - I am just guessing.  If someone can do more testing, I would be happy to update this section.
 
 *Notes:*
