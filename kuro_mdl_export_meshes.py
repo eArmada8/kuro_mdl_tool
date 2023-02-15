@@ -432,13 +432,14 @@ def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu
         with open(material_json_filename, 'wb') as f:
             f.write(json.dumps(material_struct, indent=4).encode("utf-8"))
         for i in range(len(mesh_struct["mesh_buffers"])):
+            safe_filename = "".join([x if x not in "\/:*?<>|" else "_" for x in mesh_struct["mesh_blocks"][i]["name"]])
             if mesh_struct["mesh_blocks"][i]["node_count"] > 0:
                 node_list = mesh_struct["mesh_blocks"][i]["nodes"]
             else:
                 node_list = False
             for j in range(len(mesh_struct["mesh_buffers"][i])):
                 write_fmt_ib_vb(mesh_struct["mesh_buffers"][i][j], mdl_file[:-4] +\
-                    '/{0}_{1}_{2:02d}'.format(i, mesh_struct["mesh_blocks"][i]["name"], j),\
+                    '/{0}_{1}_{2:02d}'.format(i, safe_filename, j),\
                     node_list = node_list, complete_maps = complete_maps)
 
 if __name__ == "__main__":

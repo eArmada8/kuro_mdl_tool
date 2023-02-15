@@ -141,9 +141,10 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
         prim_buffer_count = 0
     for i in range(len(mesh_struct_metadata)):
         mesh_block = bytes()
+        safe_filename = "".join([x if x not in "\/:*?<>|" else "_" for x in mesh_struct_metadata[i]["name"]])
         for j in range(len(mesh_struct_metadata[i]["primitives"])):
             try:
-                mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, mesh_struct_metadata[i]["name"], j)
+                mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, safe_filename, j)
                 fmt = read_fmt(mesh_filename + '.fmt')
                 ib = list(chain.from_iterable(read_ib(mesh_filename + '.ib', fmt)))
                 vb = read_vb(mesh_filename + '.vb', fmt)
