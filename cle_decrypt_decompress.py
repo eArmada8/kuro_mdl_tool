@@ -16,9 +16,6 @@ import blowfish, struct, operator, zstandard, shutil, sys, os, glob
 
 key = b"\x16\x4B\x7D\x0F\x4F\xA7\x4C\xAC\xD3\x7A\x06\xD9\xF8\x6D\x20\x94"
 IV = b"\x9D\x8F\x9D\xA1\x49\x60\xCC\x4C"
-cipher = blowfish.Cipher(key, byte_order = "big")
-iv = struct.unpack(">Q", IV)
-dec_counter = blowfish.ctr_counter(iv[0], f = operator.add)
 to_decrypt = [b"F9BA", b"C9BA"]
 to_decompress = [b"D9BA"]
 
@@ -30,6 +27,9 @@ def checkCLE (f):
         return False
     
 def processCLE (f):
+    cipher = blowfish.Cipher(key, byte_order = "big")
+    iv = struct.unpack(">Q", IV)
+    dec_counter = blowfish.ctr_counter(iv[0], f = operator.add)
     f.seek(0)
     file_content = f.read()
     result = file_content
