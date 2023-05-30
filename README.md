@@ -47,7 +47,6 @@ This will also change the command line argument `-c, --completemaps` into `-p, -
 ### kuro_mdl_import_meshes.py
 Double click the python script and it will search the current folder for all .mdl files with exported folders, and import the meshes in the folder back into the mdl file.  Additionally, it will parse the 3 JSON files (mesh metadata, materials and MDL version) if available and use that information to rebuild the mesh and materials sections.  This script requires a working mdl file already be present as it does not reconstruct the entire file; only the known relevant sections.  The remaining parts of the file (bone heirarchy, any animation data, etc) are copied unaltered from the intact mdl file.  By default, it will apply zstandard compression to the final file.
 
-
 It will make a backup of the original, then overwrite the original.  It will not overwrite backups; for example if "model.mdl.bak" already exists, then it will write the backup to "model.mdl.bak1", then to "model.mdl.bak2", and so on.
 
 **Command line arguments:**
@@ -56,11 +55,11 @@ It will make a backup of the original, then overwrite the original.  It will not
 `-h, --help`
 Shows help message.
 
-`-f {1,2}, --force_version {1,2}`
-This option will tell the importer to force compile the MDL at a specific Kuro version.  At this time, it only supports downgrading Kuro 2 MDLs to Kuro 1.  Hopefully in the future we will know enough about the new version to allow upgrading as well.
+`-c, --change_compression`
+By default, the import script will detect if the current (pre-import) mdl file has CLE zstandard compression applied, and will compress the new file only if the current file is compressed.  Using this option will force the script to change the compression (*e.g.* it will change the output from compressed to non-compressed, or from non-compressed to compressed).
 
-`-u, --uncompressed`
-Do not apply zstandard compression.  Not really needed as both Kuro 1 and 2 support compressed MDLs.
+`-f {1,2}, --force_version {1,2}`
+This option will tell the importer to force compile the MDL at a specific Kuro version.  At this time, it only supports downgrading Kuro 2 MDLs to Kuro 1.  Hopefully in the future we will know enough about the new version to allow upgrading as well.  Of note, when missing / invalid submeshes are detected, K1 behavior is to completely remove the entry from the MDL (needed for NISA Kuro 1), and K2 behavior is to insert a dummy (invisible) submesh (needed for CLE Kuro 2).
 
 **Adding and deleting meshes**
 

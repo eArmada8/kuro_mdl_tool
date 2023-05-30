@@ -141,6 +141,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
         prim_buffer_count = 0
     for i in range(len(mesh_struct_metadata)):
         mesh_block = bytes()
+        meshes = 0 # Keep count of actual meshes imported, in case some have been deleted
         safe_filename = "".join([x if x not in "\/:*?<>|" else "_" for x in mesh_struct_metadata[i]["name"]])
         for j in range(len(mesh_struct_metadata[i]["primitives"])):
             try:
@@ -149,17 +150,21 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                 ib = list(chain.from_iterable(read_ib(mesh_filename + '.ib', fmt)))
                 vb = read_vb(mesh_filename + '.vb', fmt)
             except FileNotFoundError:
-                print("Submesh {0} not found, generating an empty submesh...".format(mesh_filename))
-                if has_parsed_original_file == False:
-                    with open(mdl_filename + '.mdl', "rb") as f:
-                        mdl_data = f.read()
-                    mdl_data = decryptCLE(mdl_data)
-                    mesh_struct = obtain_mesh_data(mdl_data)
-                    has_parsed_original_file = True
-                # Generate an empty submesh
-                fmt = make_fmt_struct(mesh_struct["mesh_buffers"][i][j])
-                ib = []
-                vb = mesh_struct["mesh_buffers"][i][j]['vb']
+                if kuro_ver > 1:
+                    print("Submesh {0} not found, generating an empty submesh...".format(mesh_filename))
+                    if has_parsed_original_file == False:
+                        with open(mdl_filename + '.mdl', "rb") as f:
+                            mdl_data = f.read()
+                        mdl_data = decryptCLE(mdl_data)
+                        mesh_struct = obtain_mesh_data(mdl_data)
+                        has_parsed_original_file = True
+                    # Generate an empty submesh
+                    fmt = make_fmt_struct(mesh_struct["mesh_buffers"][i][j])
+                    ib = []
+                    vb = mesh_struct["mesh_buffers"][i][j]['vb']
+                else:
+                    print("Submesh {0} not found, skipping...".format(mesh_filename))
+                    continue
             print("Processing submesh {0}...".format(mesh_filename))
             primitive_buffer = struct.pack("<I", mesh_struct_metadata[i]["primitives"][j]["material_offset"])
             if kuro_ver == 1:
@@ -233,7 +238,8 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                 prim_output_data += raw_ibuffer
                 prim_buffer_count += 1
             mesh_block += primitive_buffer
-        mesh_block = struct.pack("<I", len(mesh_struct_metadata[i]["primitives"])) + mesh_block
+            meshes += 1
+        mesh_block = struct.pack("<I", meshes) + mesh_block
         if "nodes" in mesh_struct_metadata[i].keys():
             node_count = len(mesh_struct_metadata[i]["nodes"])
         else:
@@ -255,11 +261,15 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
             primitive_section_buffer += struct.pack("<2I", 4, len(primitive_output_buffer)) + primitive_output_buffer
     return(mesh_section_buffer, primitive_section_buffer)
 
-def process_mdl (mdl_file, compress = True, force_kuro_version = False):
+def process_mdl (mdl_file, change_compression = False, force_kuro_version = False):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
-    mdl_data = decryptCLE(mdl_data)
+    if mdl_data[0:4] in [b"F9BA", b"C9BA", b"D9BA"]:
+        compressed = True
+        mdl_data = decryptCLE(mdl_data)
+    else:
+        compressed = False
     kuro_ver = get_kuro_ver(mdl_data)
     try: # Attempt to get MDL version from JSON file, if this fails just use version number embedded in MDL
         json_kuro_ver = read_struct_from_json(mdl_file[:-4] + '/mdl_version.json')['mdl_version']
@@ -283,7 +293,7 @@ def process_mdl (mdl_file, compress = True, force_kuro_version = False):
         shutil.copy2(mdl_file, mdl_file + '.bak' + backup_suffix)
     else:
         shutil.copy2(mdl_file, mdl_file + '.bak')
-    if compress == True:
+    if (compressed == True and change_compression == False) or (compressed == False and change_compression == True):
         new_mdl_data = compressCLE(new_mdl_data)
     with open(mdl_file,'wb') as f:
         f.write(new_mdl_data)
@@ -297,7 +307,7 @@ if __name__ == "__main__":
         import argparse
         parser = argparse.ArgumentParser()
         parser.add_argument('-f', '--force_version', help="Force compile at a specific Kuro version (must be equal to or lower than original)", type=int, choices=range(1,3))
-        parser.add_argument('-u', '--uncompressed', help="Do not apply zstandard compression", action="store_false")
+        parser.add_argument('-c', '--change_compression', help="Change compression (compressed to uncompressed or vice versa)", action="store_true")
         parser.add_argument('mdl_filename', help="Name of mdl file to import into (required).")
         args = parser.parse_args()
         if args.force_version == None:
@@ -305,7 +315,7 @@ if __name__ == "__main__":
         else:
             force_kuro_version = args.force_version
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
-            process_mdl(args.mdl_filename, compress = args.uncompressed, force_kuro_version = force_kuro_version)
+            process_mdl(args.mdl_filename, change_compression = args.change_compression, force_kuro_version = force_kuro_version)
     else:
         mdl_files = glob.glob('*.mdl')
         mdl_files = [x for x in mdl_files if os.path.isdir(x[:-4])]
