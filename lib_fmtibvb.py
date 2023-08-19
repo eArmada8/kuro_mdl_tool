@@ -53,6 +53,18 @@ def unpack_dxgi_vector(f, stride, dxgi_format, e = '<'):
         float_max = ((2**vec_bits)-1)
         for i in range(len(read)):
             read[i] = read[i] / float_max
+    elif numtype == "SNORM" and (vec_elements * vec_bits / 8 == stride):
+        # First read as integers
+        if vec_bits == 32:
+            read = list(struct.unpack(e+str(vec_elements)+"i", f.read(stride)))
+        elif vec_bits == 16:
+            read = list(struct.unpack(e+str(vec_elements)+"h", f.read(stride)))
+        elif vec_bits == 8:
+            read = list(struct.unpack(e+str(vec_elements)+"b", f.read(stride)))
+        # Convert to normalized floats
+        float_max = ((2**(vec_bits-1))-1)
+        for i in range(len(read)):
+            read[i] = read[i] / float_max
     else:
         read = f.read(stride)
     return (read)
@@ -106,6 +118,18 @@ def pack_dxgi_vector(f, data, stride, dxgi_format, e = '<'):
                 f.write(struct.pack(e+"H", converted_data[i]))
             elif vec_bits == 8:
                 f.write(struct.pack(e+"B", converted_data[i]))
+    elif numtype == 'SNORM' and (vec_elements * vec_bits / 8 == stride):
+        converted_data = []
+        for i in range(vec_elements):
+            #First convert back to unsigned integers, then pack
+            float_max = ((2**(vec_bits-1))-1)
+            converted_data.append(int(round(min(max(data[i],-1), 1) * float_max)))
+            if vec_bits == 32:
+                f.write(struct.pack(e+"i", converted_data[i]))
+            elif vec_bits == 16:
+                f.write(struct.pack(e+"h", converted_data[i]))
+            elif vec_bits == 8:
+                f.write(struct.pack(e+"b", converted_data[i]))
     else:
         write = f.write(data)
     return
@@ -189,9 +213,15 @@ def read_ib(ib_filename, fmt_struct, e = '<'):
 def write_ib_stream(ib_data, ib_stream, fmt_struct, e = '<'):
     # See above about cheating
     ib_stride = int(int(re.findall("[0-9]+", fmt_struct["format"])[0])/8)
-    for i in range(len(ib_data)):
-        for j in range(len(ib_data[i])):
-            pack_dxgi_vector(ib_stream, [ib_data[i][j]], ib_stride, fmt_struct["format"], e)
+    if len(ib_data) > 0:
+        if type(ib_data[0]) == list: # Flatten list for legacy code
+            new_ib_data = [x for y in ib_data for x in y]
+        else:
+            new_ib_data = ib_data
+    else:
+        new_ib_data = ib_data
+    for i in range(len(new_ib_data)):
+        pack_dxgi_vector(ib_stream, [new_ib_data[i]], ib_stride, fmt_struct["format"], e)
     return
 
 def write_ib(ib_data, ib_filename, fmt_struct, e = '<'):
@@ -258,9 +288,18 @@ def write_vb(vb_data, vb_filename, fmt_struct, e = '<', interleave = True):
     return
 
 # The following two functions are purely for convenience
-def read_struct_from_json(filename):
+def read_struct_from_json(filename, raise_on_fail = True):
     with open(filename, 'r') as f:
-        return(json.loads(f.read()))
+        try:
+            return(json.loads(f.read()))
+        except json.JSONDecodeError as e:
+            print("Decoding error when trying to read JSON file {0}!\r\n".format(filename))
+            print("{0} at line {1} column {2} (character {3})\r\n".format(e.msg, e.lineno, e.colno, e.pos))
+            if raise_on_fail == True:
+                input("Press Enter to abort.")
+                raise
+            else:
+                return(False)
 
 def write_struct_to_json(struct, filename):
     if not filename[:-5] == '.json':
