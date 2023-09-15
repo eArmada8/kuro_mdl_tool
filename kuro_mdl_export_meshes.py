@@ -71,10 +71,13 @@ def isolate_mesh_data (mdl_data):
             contents.append(section_info)
             f.seek(section_info["size"],1) # Move forward to the next section
         # Kuro models seem to only have one mesh section
-        mesh_section = [x for x in contents if x["type"] == 1][0]
-        f.seek(mesh_section["section_start_offset"],0)
-        mesh_section_data = f.read(mesh_section["size"])
-        return(mesh_section_data)
+        if len([x for x in contents if x["type"] == 1]) > 0:
+            mesh_section = [x for x in contents if x["type"] == 1][0]
+            f.seek(mesh_section["section_start_offset"],0)
+            mesh_section_data = f.read(mesh_section["size"])
+            return(mesh_section_data)
+        else:
+            return False
 
 # Kuro 2 has separate primitive section
 def isolate_primitive_data (mdl_data):
@@ -116,6 +119,8 @@ def parse_primitive_header (primitive_data):
 def obtain_mesh_data (mdl_data, trim_for_gpu = False):
     kuro_ver = get_kuro_ver(mdl_data)
     mesh_data = isolate_mesh_data(mdl_data)
+    if mesh_data == False:
+        return False
     if kuro_ver > 1:
         primitive_data = isolate_primitive_data(mdl_data)
         primitive_info = parse_primitive_header(primitive_data)
@@ -307,15 +312,20 @@ def isolate_material_data (mdl_data):
             section_info["section_start_offset"] = f.tell()
             contents.append(section_info)
             f.seek(section_info["size"],1) # Move forward to the next section
-        # Kuro models seem to only have one material section
-        material_section = [x for x in contents if x["type"] == 0][0]
-        f.seek(material_section["section_start_offset"],0)
-        material_section_data = f.read(material_section["size"])
-        return(material_section_data)
+        if len([x for x in contents if x["type"] == 0]) > 0:
+            # Kuro models seem to only have one material section
+            material_section = [x for x in contents if x["type"] == 0][0]
+            f.seek(material_section["section_start_offset"],0)
+            material_section_data = f.read(material_section["size"])
+            return(material_section_data)
+        else:
+            return False
 
 def obtain_material_data (mdl_data):
     kuro_ver = get_kuro_ver(mdl_data)
     material_data = isolate_material_data(mdl_data)
+    if material_data == False:
+        return False
     with io.BytesIO(material_data) as f:
         blocks, = struct.unpack("<I",f.read(4))
         material_blocks = []
@@ -419,6 +429,9 @@ def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu
     material_struct = obtain_material_data(mdl_data)
     material_json_filename = mdl_file[:-4] + '/material_info.json'
     mdl_version_json_filename = mdl_file[:-4] + '/mdl_version.json'
+    if mesh_struct == False and material_struct == False:
+        print ("Skipping {0} as it lacks mesh and material data.".format(mdl_file))
+        return False
     if os.path.exists(mdl_file[:-4]) and (os.path.isdir(mdl_file[:-4])) and (overwrite == False):
         if str(input(mdl_file[:-4] + " folder exists! Overwrite? (y/N) ")).lower()[0:1] == 'y':
             overwrite = True
