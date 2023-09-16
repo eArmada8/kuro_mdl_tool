@@ -242,7 +242,7 @@ def calc_abs_ani_rotations (skel_struct, ani_struct):
 
 def generate_materials(gltf_data, material_struct):
     images = sorted(list(set([x['texture_image_name'] for y in material_struct for x in y['textures']])))
-    gltf_data['images'] = [{'uri':x+'.dds'} for x in images]
+    gltf_data['images'] = [{'uri':'textures/{}.png'.format(x)} for x in images]
     khr = { "KHR_texture_transform": { "offset": [0, 0], "rotation": 0, "scale": [1, -1] } }
     for i in range(len(material_struct)):
         material = { 'name': material_struct[i]['material_name'] }
@@ -292,10 +292,14 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
     if not mesh_struct == False:
         gltf_data['textures'] = []
     giant_buffer = bytes()
-    mesh_nodes = []
     buffer_view = 0
     if not material_struct == False:
         gltf_data = generate_materials(gltf_data, material_struct)
+        missing_textures = [x['uri'] for x in gltf_data['images'] if not os.path.exists(x['uri'])]
+        if len(missing_textures) > 0:
+            print("Warning:  The following textures were not found:")
+            for texture in missing_textures:
+                print("{}".format(texture))
     for i in range(len(skel_struct)):
         node = {'children': skel_struct[i]['children'], 'name': skel_struct[i]['name']}
         if 'pose_matrix' in skel_struct[i]:
@@ -348,6 +352,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                 has_skeleton = False
             if has_skeleton:
                 global_node_dict = local_to_global_bone_indices(i, mesh_struct, skel_struct)
+            primitives = []
             for j in range(len(mesh_struct["mesh_buffers"][i])): # Submesh
                 print("Processing {0} submesh {1}...".format(mesh_struct["mesh_blocks"][i]["name"], j))
                 if has_skeleton:
@@ -409,12 +414,12 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                 primitive["mode"] = 4 #TRIANGLES
                 if mesh_struct['mesh_blocks'][i]['primitives'][j]['material_offset'] < len(gltf_data['materials']):
                     primitive["material"] = mesh_struct['mesh_blocks'][i]['primitives'][j]['material_offset']
-                mesh_nodes.append(len(gltf_data['nodes']))
-                gltf_data['nodes'].append({'mesh': len(gltf_data['meshes']), 'name': "Mesh_{0}_{1}".format(i,j)})
-                gltf_data['meshes'].append({"primitives": [primitive], "name": "Mesh_{0}_{1}".format(i,j)})
-                if has_skeleton:
-                    gltf_data['nodes'][-1]['skin'] = len(gltf_data['skins'])
+                primitives.append(primitive)
                 del(submesh)
+            mesh_node = [j for j in range(len(gltf_data['nodes']))\
+                if gltf_data['nodes'][j]['name'] == mesh_struct["mesh_blocks"][i]["name"]][0]
+            gltf_data['nodes'][mesh_node]['mesh'] = len(gltf_data['meshes'])
+            gltf_data['meshes'].append({"primitives": primitives, "name": mesh_struct["mesh_blocks"][i]["name"]})
             if has_skeleton:
                 inv_mtx_buffer = bytes()
                 for k in global_node_dict:
@@ -423,6 +428,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                     inv_bind_mtx = numpy.linalg.inv(mtx)
                     inv_bind_mtx = numpy.ndarray.transpose(inv_bind_mtx)
                     inv_mtx_buffer += struct.pack("<16f", *[num for row in inv_bind_mtx for num in row])
+                gltf_data['nodes'][mesh_node]['skin'] = len(gltf_data['skins'])
                 gltf_data['skins'].append({"inverseBindMatrices": len(gltf_data['accessors']), "joints": list(global_node_dict.values())})
                 gltf_data['accessors'].append({"bufferView" : buffer_view,\
                     "componentType": 5126,\
@@ -433,7 +439,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                     "byteLength": len(inv_mtx_buffer)})
                 buffer_view += 1
                 giant_buffer += inv_mtx_buffer
-        gltf_data['scenes'][0]['nodes'].extend(mesh_nodes)
+            gltf_data['scenes'][0]['nodes'].append(mesh_node)
     gltf_data['buffers'].append({"byteLength": len(giant_buffer)})
     if write_glb == True:
         with open(filename[:-4]+'.glb', 'wb') as f:
