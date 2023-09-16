@@ -35,7 +35,7 @@ def make_pascal_string(string):
 
 # Primitive data is in Kuro 2.  In Kuro 1, it will be an empty buffer.
 # force_kuro_version should be either set to False, or to an integer.
-def insert_model_data (mdl_data, material_section_data, mesh_section_data, primitive_section_data, kuro_ver):
+def insert_model_data (mdl_data, skeleton_section_data, material_section_data, mesh_section_data, primitive_section_data, kuro_ver):
     with io.BytesIO(mdl_data) as f:
         new_mdl_data = f.read(4) #Header
         orig_kuro_ver, = struct.unpack("<I", f.read(4))
@@ -55,6 +55,8 @@ def insert_model_data (mdl_data, material_section_data, mesh_section_data, primi
                 section = material_section_data
             if section_info["type"] == 1: # Mesh section to replace
                 section = mesh_section_data
+            if section_info["type"] == 2: # Skeleton section to replace
+                section = skeleton_section_data
             if section_info["type"] == 4: # Primitive section to replace
                 if kuro_ver > 1:
                     section = primitive_section_data
@@ -65,6 +67,29 @@ def insert_model_data (mdl_data, material_section_data, mesh_section_data, primi
         f.seek(current_offset,0)
         new_mdl_data += f.read()
         return(new_mdl_data)
+
+def build_skeleton_section (mdl_filename, kuro_ver = 1):
+    # Will read data from JSON file, or load original data from the mdl file if JSON is missing
+    try:
+        skel_struct = read_struct_from_json(mdl_filename + "/skeleton.json")
+    except:
+        with open(mdl_filename + '.mdl', "rb") as f:
+            mdl_data = f.read()
+        mdl_data = decryptCLE(mdl_data)
+        skel_struct = obtain_skeleton_data(mdl_data)
+    output_buffer = struct.pack("<I", len(skel_struct))
+    for i in range(len(skel_struct)):
+        output_buffer += make_pascal_string(skel_struct[i]['name'])
+        output_buffer += struct.pack("<Ii", skel_struct[i]['type'], skel_struct[i]['mesh_index'])
+        output_buffer += struct.pack("<3f", *skel_struct[i]['pos_xyz'])
+        output_buffer += struct.pack("<4f", *skel_struct[i]['unknown_quat'])
+        output_buffer += struct.pack("<I", skel_struct[i]['skin_mesh'])
+        output_buffer += struct.pack("<3f", *skel_struct[i]['rotation_euler_rpy'])
+        output_buffer += struct.pack("<3f", *skel_struct[i]['scale'])
+        output_buffer += struct.pack("<3f", *skel_struct[i]['unknown'])
+        output_buffer += struct.pack("<I", len(skel_struct[i]['children']))
+        output_buffer += struct.pack("<{}I".format(len(skel_struct[i]['children'])), *skel_struct[i]['children'])
+    return(struct.pack("<2I", 2, len(output_buffer)) + output_buffer)
 
 def build_material_section (mdl_filename, kuro_ver = 1):
     # Will read data from JSON file, or load original data from the mdl file if JSON is missing
@@ -270,6 +295,9 @@ def process_mdl (mdl_file, change_compression = False, force_kuro_version = Fals
         mdl_data = decryptCLE(mdl_data)
     else:
         compressed = False
+    if obtain_material_data(mdl_data) == False:
+        print("Skipping {0} as it is not a model file.".format(mdl_file))
+        return False
     kuro_ver = get_kuro_ver(mdl_data)
     try: # Attempt to get MDL version from JSON file, if this fails just use version number embedded in MDL
         json_kuro_ver = read_struct_from_json(mdl_file[:-4] + '/mdl_version.json')['mdl_version']
@@ -280,9 +308,10 @@ def process_mdl (mdl_file, change_compression = False, force_kuro_version = Fals
     # Command line option overrides JSON file
     if force_kuro_version != False and force_kuro_version < kuro_ver:
         kuro_ver = force_kuro_version
+    skeleton_data = build_skeleton_section(mdl_file[:-4], kuro_ver)
     material_data = build_material_section(mdl_file[:-4], kuro_ver)
     mesh_data, primitive_data = build_mesh_section(mdl_file[:-4], kuro_ver)
-    new_mdl_data = insert_model_data(mdl_data, material_data, mesh_data, primitive_data, kuro_ver)
+    new_mdl_data = insert_model_data(mdl_data, skeleton_data, material_data, mesh_data, primitive_data, kuro_ver)
     # Instead of overwriting backups, it will just tag a number onto the end
     backup_suffix = ''
     if os.path.exists(mdl_file + '.bak' + backup_suffix):

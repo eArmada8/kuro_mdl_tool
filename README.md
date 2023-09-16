@@ -19,7 +19,7 @@ kuro_mdl_import_meshes.py is dependent on both kuro_mdl_export_meshes.py and lib
 
 ## Usage:
 ### kuro_mdl_export_meshes.py
-Double click the python script and it will search the current folder for all .mdl files and export the meshes into a folder with the same name as the mdl file.  Additionally, it will output 3 JSON files, one with metadata from the mesh section, another with the data from the materials section, and a third with the MDL version.
+Double click the python script and it will search the current folder for all .mdl files and export the meshes into a folder with the same name as the mdl file.  Additionally, it will output 4 JSON files, one with metadata from the mesh section, another with the data from the materials section, another with the skeleton, and a fourth with the MDL version.
 
 **Command line arguments:**
 `kuro_mdl_export_meshes.py [-h] [-c] [-t] [-o] mdl_filename`
@@ -45,7 +45,7 @@ which you can change to
 This will also change the command line argument `-c, --completemaps` into `-p, --partialmaps` which you would call to enable non-empty group vgmaps instead.
 
 ### kuro_mdl_import_meshes.py
-Double click the python script and it will search the current folder for all .mdl files with exported folders, and import the meshes in the folder back into the mdl file.  Additionally, it will parse the 3 JSON files (mesh metadata, materials and MDL version) if available and use that information to rebuild the mesh and materials sections.  This script requires a working mdl file already be present as it does not reconstruct the entire file; only the known relevant sections.  The remaining parts of the file (bone heirarchy, any animation data, etc) are copied unaltered from the intact mdl file.  By default, it will apply zstandard compression to the final file.
+Double click the python script and it will search the current folder for all .mdl files with exported folders, and import the meshes in the folder back into the mdl file.  Additionally, it will parse the 4 JSON files (mesh metadata, materials, skeleton and MDL version) if available and use that information to rebuild the mesh, materials and skeleton sections.  This script requires a working mdl file already be present as it does not reconstruct the entire file; only the known relevant sections.  The remaining parts of the file (any animation data, etc) are copied unaltered from the intact mdl file.  By default, it will apply zstandard compression to the final file if the original file is compressed.
 
 It will make a backup of the original, then overwrite the original.  It will not overwrite backups; for example if "model.mdl.bak" already exists, then it will write the backup to "model.mdl.bak1", then to "model.mdl.bak2", and so on.
 
@@ -91,6 +91,12 @@ Please see the instructions above for changing textures.  I have successfully ch
 *Notes:*
 - All the changes should be in material_info.json.  There is nothing worth changing in mesh_info.json.
 
+**Changing the skeleton**
+
+I do not recommend directly editing skeleton.json, although it certainly is possible.  It is better to generate a glTF file (see below), import into Blender using Bone Dir "Blender (best for re-importing)", and edit the skeleton there.  *Do not use the default Bone Dir setting, "Temperance (Average)", if you intend to export the skeleton!*  Export as .glb, then run kuro_gltf_to_skeleton.py to extract the skeleton.
+
+Clean up the resulting .json file and it can replace skeleton.json.  The most important thing to do is to open up the original skeleton.json, figure out the master mesh nodes that match the base names of your meshes (for example, in chr5001_c03, they are "chr5001_hair_setup2", "chr5001_shadow_setup" and "woman01_body79"), and copy over the "type" and "mesh_index" from the original.  Extra mesh nodes might also need to be removed.
+
 ### kuro_mdl_to_basic_gltf.py
 Double click the python script to run and it will attempt to convert the MDL model into a basic glTF model, with skeleton (in .glb format).  This tool as written is for obtaining the skeleton for rigging the .fmt/.ib/.vb/.vgmap meshes from the export tool.  *The meshes included in the model are not particularly useful as they cannot be exported back to MDL,* just delete them and import the exported meshes (.fmt/.ib/.vb./vgmap) instead - the tool only includes meshes because Blender refuses to open a glTF file without meshes.  After importing the meshes, Ctrl-click on the armature and parent (Object -> Parent -> Armature Deform {without the extra options}).
 
@@ -116,6 +122,9 @@ Output .gltf/.bin format instead of .glb format.
 Double click the python script to run, and it will attempt to merge each animation it finds with its base model.  Animations are detected as .glb (or .gltf) files with underscores in their names, and the base model is the prefix before the first underscore.  For example, if it finds chr5001_mot_walk.glb, it will attempt to merge into it chr5001.glb.  The original animation will be overwritten with the merged animation.
 
 There are no command line options.
+
+### kuro_gltf_to_skeleton.py
+Double click the python script to run, and it will attempt to pull the skeleton out of each glTF file it finds (.glb or .gltf).  It will generate a gltf_filename_skeleton.json file for every gltf_filename.glb that it finds.  This is very experimental, and it is very likely that the file will need to be customized before use.  At the very least, "type" and "mesh_index" must be fixed for the base nodes of the meshes.  Extra nodes might also need to be removed.
 
 ### cle_compress.py
 This script will compress files with zstandard so they can be used in Kuro no Kiseki 2 (CLE release).  If double-clicked, it will compress all files it finds in the current directory, assuming they are not .py, .bak, or already compressed.  This is not necessary with output from the importer since the files are already compressed, but would be needed for textures, etc.

@@ -37,60 +37,17 @@ def calc_abs_rotation_position(bone, parent_bone):
     bone["abs_p"] = (numpy.array(qp.rotate(bone['pos_xyz'])) + parent_bone['abs_p']).tolist()
     return(bone)
 
-def isolate_skeleton_data (mdl_data):
-    with io.BytesIO(mdl_data) as f:
-        mdl_header = struct.unpack("<III",f.read(12))
-        if not mdl_header[0] == 0x204c444d:
-            sys.exit()
-        contents = []
-        while True:
-            current_offset = f.tell()
-            section_info = {}
-            try:
-                section_info["type"], section_info["size"] = struct.unpack("<II",f.read(8))
-            except:
-                break
-            section_info["section_start_offset"] = f.tell()
-            contents.append(section_info)
-            f.seek(section_info["size"],1) # Move forward to the next section
-        # Kuro models seem to only have one skeleton section
-        skeleton_section = [x for x in contents if x["type"] == 2][0]
-        f.seek(skeleton_section["section_start_offset"],0)
-        skeleton_section_data = f.read(skeleton_section["size"])
-        return(skeleton_section_data)
-
-def obtain_skeleton_data (skeleton_section_bytes):
-    with io.BytesIO(skeleton_section_bytes) as f:
-        blocks, = struct.unpack("<I",f.read(4))
-        node_blocks = []
-        for i in range(blocks):
-            node_block = {}
-            node_block['id_referenceonly'] = i # Not used at all for repacking, purely for convenience
-            node_block['name'] = read_pascal_string(f).decode("ASCII")
-            # node_block['type']: 0 = transform only, 1 = skin child, 2 = mesh
-            node_block['type'], node_block['mesh_index'] = struct.unpack("<Ii",f.read(8))
-            node_block['pos_xyz'] = struct.unpack("<3f",f.read(12))
-            node_block['unknown_quat'] = struct.unpack("<4f",f.read(16))
-            node_block['skin_mesh'], = struct.unpack("<I",f.read(4))
-            node_block['rotation_euler_rpy'] = struct.unpack("<3f",f.read(12))
-            node_block['q_wxyz'] = rpy2quat(node_block['rotation_euler_rpy'])
-            node_block['scale'] = struct.unpack("<3f",f.read(12))
-            node_block['unknown'] = struct.unpack("<3f",f.read(12))
-            child_count, = struct.unpack("<I",f.read(4))
-            node_block['children'] = []
-            for j in range(child_count):
-                child, = struct.unpack("<I",f.read(4))
-                node_block['children'].append(child)
-            node_blocks.append(node_block)
-        for i in range(len(node_blocks)):
-            if i == 0:
-                node_blocks[i]['parentID'] = -1
-                node_blocks[i]['abs_q'] = node_blocks[i]['q_wxyz']
-                node_blocks[i]['abs_p'] = node_blocks[i]['pos_xyz']
-            else:
-                node_blocks[i]['parentID'] = [x['id_referenceonly'] for x in node_blocks if i in x['children']][0]
-                node_blocks[i] = calc_abs_rotation_position(node_blocks[i], node_blocks[node_blocks[i]['parentID']])  
-    return(node_blocks)
+def process_skeleton_data(skel_struct):
+    for i in range(len(skel_struct)):
+        skel_struct[i]['q_wxyz'] = rpy2quat(skel_struct[i]['rotation_euler_rpy'])
+        if i == 0:
+            skel_struct[i]['parentID'] = -1
+            skel_struct[i]['abs_q'] = skel_struct[i]['q_wxyz']
+            skel_struct[i]['abs_p'] = skel_struct[i]['pos_xyz']
+        else:
+            skel_struct[i]['parentID'] = [x['id_referenceonly'] for x in skel_struct if i in x['children']][0]
+            skel_struct[i] = calc_abs_rotation_position(skel_struct[i], skel_struct[skel_struct[i]['parentID']])  
+    return(skel_struct)
 
 # This only handles formats compatible with Kuro MDL (Float, UINT)
 def convert_format_for_gltf(dxgi_format):
@@ -505,8 +462,7 @@ def process_mdl (mdl_file, overwrite = False, write_glb = True):
         mdl_data = decryptCLE(mdl_data)
         mesh_struct = obtain_mesh_data(mdl_data, trim_for_gpu = True)
         material_struct = obtain_material_data(mdl_data)
-        skel_data = isolate_skeleton_data(mdl_data)
-        skel_struct = obtain_skeleton_data(skel_data)
+        skel_struct = process_skeleton_data(obtain_skeleton_data(mdl_data))
         ani_data = isolate_animation_data(mdl_data)
         ani_struct = obtain_animation_data(ani_data)
         if not ani_struct == False:

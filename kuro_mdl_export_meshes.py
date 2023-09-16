@@ -54,6 +54,58 @@ def read_pascal_string(f):
     sz = int.from_bytes(f.read(1), byteorder="little")
     return f.read(sz)
 
+def isolate_skeleton_data (mdl_data):
+    with io.BytesIO(mdl_data) as f:
+        mdl_header = struct.unpack("<III",f.read(12))
+        if not mdl_header[0] == 0x204c444d:
+            sys.exit()
+        contents = []
+        while True:
+            current_offset = f.tell()
+            section_info = {}
+            try:
+                section_info["type"], section_info["size"] = struct.unpack("<II",f.read(8))
+            except:
+                break
+            section_info["section_start_offset"] = f.tell()
+            contents.append(section_info)
+            f.seek(section_info["size"],1) # Move forward to the next section
+        # Kuro models seem to only have one skeleton section
+        if len([x for x in contents if x["type"] == 2]) > 0:
+            skeleton_section = [x for x in contents if x["type"] == 2][0]
+            f.seek(skeleton_section["section_start_offset"],0)
+            skeleton_section_data = f.read(skeleton_section["size"])
+            return(skeleton_section_data)
+        else:
+            return False
+
+def obtain_skeleton_data (mdl_data):
+    skel_data = isolate_skeleton_data(mdl_data)
+    if skel_data == False:
+        return False
+    with io.BytesIO(skel_data) as f:
+        blocks, = struct.unpack("<I",f.read(4))
+        skel_struct = []
+        for i in range(blocks):
+            node_block = {}
+            node_block['id_referenceonly'] = i # Not used at all for repacking, purely for convenience
+            node_block['name'] = read_pascal_string(f).decode("ASCII")
+            # node_block['type']: 0 = transform only, 1 = skin child, 2 = mesh
+            node_block['type'], node_block['mesh_index'] = struct.unpack("<Ii",f.read(8))
+            node_block['pos_xyz'] = struct.unpack("<3f",f.read(12))
+            node_block['unknown_quat'] = struct.unpack("<4f",f.read(16))
+            node_block['skin_mesh'], = struct.unpack("<I",f.read(4))
+            node_block['rotation_euler_rpy'] = struct.unpack("<3f",f.read(12))
+            node_block['scale'] = struct.unpack("<3f",f.read(12))
+            node_block['unknown'] = struct.unpack("<3f",f.read(12))
+            child_count, = struct.unpack("<I",f.read(4))
+            node_block['children'] = []
+            for j in range(child_count):
+                child, = struct.unpack("<I",f.read(4))
+                node_block['children'].append(child)
+            skel_struct.append(node_block)
+    return(skel_struct)
+
 def isolate_mesh_data (mdl_data):
     with io.BytesIO(mdl_data) as f:
         mdl_header = struct.unpack("<III",f.read(12))
@@ -428,6 +480,8 @@ def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu
     mesh_json_filename = mdl_file[:-4] + '/mesh_info.json'
     material_struct = obtain_material_data(mdl_data)
     material_json_filename = mdl_file[:-4] + '/material_info.json'
+    skel_struct = obtain_skeleton_data(mdl_data)
+    skel_json_filename = mdl_file[:-4] + '/skeleton.json'
     mdl_version_json_filename = mdl_file[:-4] + '/mdl_version.json'
     if mesh_struct == False and material_struct == False:
         print ("Skipping {0} as it lacks mesh and material data.".format(mdl_file))
@@ -444,6 +498,8 @@ def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu
             f.write(json.dumps(mesh_struct["mesh_blocks"], indent=4).encode("utf-8"))
         with open(material_json_filename, 'wb') as f:
             f.write(json.dumps(material_struct, indent=4).encode("utf-8"))
+        with open(skel_json_filename, 'wb') as f:
+            f.write(json.dumps(skel_struct, indent=4).encode("utf-8"))
         for i in range(len(mesh_struct["mesh_buffers"])):
             safe_filename = "".join([x if x not in "\/:*?<>|" else "_" for x in mesh_struct["mesh_blocks"][i]["name"]])
             if mesh_struct["mesh_blocks"][i]["node_count"] > 0:
