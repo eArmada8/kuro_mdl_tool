@@ -92,7 +92,11 @@ Please see the instructions above for changing textures.  I have successfully ch
 - All the changes should be in material_info.json.  There is nothing worth changing in mesh_info.json.
 
 ### kuro_mdl_to_basic_gltf.py
-Double click the python script to run and it will attempt to convert the MDL model into a basic glTF model, with skeleton.  This tool as written is for obtaining the skeleton for rigging the .fmt/.ib/.vb/.vgmap meshes from the export tool.  *The meshes included in the model are not particularly useful as they cannot be exported back to MDL,* just delete them and import the exported meshes (.fmt/.ib/.vb./vgmap) instead - the tool only includes meshes because Blender refuses to open a glTF file without meshes.  After importing the meshes, Ctrl-click on the armature and parent (Object -> Parent -> Armature Deform {without the extra options}).
+Double click the python script to run and it will attempt to convert the MDL model into a basic glTF model, with skeleton (in .glb format).  This tool as written is for obtaining the skeleton for rigging the .fmt/.ib/.vb/.vgmap meshes from the export tool.  *The meshes included in the model are not particularly useful as they cannot be exported back to MDL,* just delete them and import the exported meshes (.fmt/.ib/.vb./vgmap) instead - the tool only includes meshes because Blender refuses to open a glTF file without meshes.  After importing the meshes, Ctrl-click on the armature and parent (Object -> Parent -> Armature Deform {without the extra options}).
+
+The script has basic texture support.  Place all the textures required in the same folder as the .glb file, in .dds format.  Blender does not support BC7 textures, so convert to BC1/BC3 first.
+
+Animations will also be converted into glTF (in .glb format).  The glb files can be directly imported into Blender, but Bone Dir must be set to "Blender (best for re-importing)" upon import or the skeleton will be altered irreversibly, preventing the animation from being used in the game.  (Repacking animations is not yet supported.)  Using the files directly is not recommended; instead decompile the base model as well, and put the .glb file in the same folder with the animations and run kuro_merge_model_into_animations.py in that folder. It will insert the model data including meshes / skins / texture references etc into the animation .glb, which will make animation feasible.
 
 It will search the current folder for mdl files and convert them all, unless you use command line options.
 
@@ -104,6 +108,14 @@ Shows help message.
 
 `-o, --overwrite`
 Overwrite existing files without prompting.
+
+`-t, --textformat`
+Output .gltf/.bin format instead of .glb format.
+
+### kuro_merge_model_into_animations.py
+Double click the python script to run, and it will attempt to merge each animation it finds with its base model.  Animations are detected as .glb (or .gltf) files with underscores in their names, and the base model is the prefix before the first underscore.  For example, if it finds chr5001_mot_walk.glb, it will attempt to merge into it chr5001.glb.  The original animation will be overwritten with the merged animation.
+
+There are no command line options.
 
 ### cle_compress.py
 This script will compress files with zstandard so they can be used in Kuro no Kiseki 2 (CLE release).  If double-clicked, it will compress all files it finds in the current directory, assuming they are not .py, .bak, or already compressed.  This is not necessary with output from the importer since the files are already compressed, but would be needed for textures, etc.
