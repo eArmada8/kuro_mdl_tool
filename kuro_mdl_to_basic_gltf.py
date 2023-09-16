@@ -283,7 +283,38 @@ def calc_abs_ani_rotations (skel_struct, ani_struct):
         ani_struct[i]['outputs'] = [x[1:]+[x[0]] for x in [list(base_r * Quaternion([x[3]]+x[0:3])) for x in ani_struct[i]['outputs']]]
     return (ani_struct)
 
-def write_glTF(filename, skel_struct, mesh_struct = False, ani_struct = False):
+def generate_materials(gltf_data, material_struct):
+    images = sorted(list(set([x['texture_image_name'] for y in material_struct for x in y['textures']])))
+    gltf_data['images'] = [{'uri':x+'.dds'} for x in images]
+    khr = { "KHR_texture_transform": { "offset": [0, 0], "rotation": 0, "scale": [1, -1] } }
+    for i in range(len(material_struct)):
+        material = { 'name': material_struct[i]['material_name'] }
+        for j in range(len(material_struct[i]['textures'])):
+            if material_struct[i]['textures'][j]['unk_01'] in [0,1,2]:
+                wrapS = {0:10497,1:33648,2:33071}[material_struct[i]['textures'][j]['unk_01']]
+            else:
+                wrapS = 10497
+            if material_struct[i]['textures'][j]['unk_02'] in [0,1,2]:
+                wrapT = {0:10497,1:33648,2:33071}[material_struct[i]['textures'][j]['unk_02']]
+            else:
+                wrapT = 10497
+            sampler = { 'wrapS': wrapS, 'wrapT': wrapT }
+            texture = { 'source': images.index(material_struct[i]['textures'][j]['texture_image_name']), 'sampler': len(gltf_data['samplers']) }
+            if material_struct[i]['textures'][j]['texture_slot'] == 0:
+                material['pbrMetallicRoughness']= { 'baseColorTexture' : { 'index' : len(gltf_data['textures']), 'texCoord': material_struct[i]['uv_map_indices'][j] },\
+                    'metallicFactor' : 0.0, 'roughnessFactor' : 1.0 }
+                if material_struct[i]['uv_map_indices'][j] == 0:
+                    material['pbrMetallicRoughness']['baseColorTexture']['extensions'] = khr
+            elif material_struct[i]['textures'][j]['texture_slot'] == 3:
+                material['normalTexture'] =  { 'index' : len(gltf_data['textures']), 'texCoord': material_struct[i]['uv_map_indices'][j] }
+                if material_struct[i]['uv_map_indices'][j] == 0:
+                    material['normalTexture']['extensions'] = khr
+            gltf_data['samplers'].append(sampler)
+            gltf_data['textures'].append(texture)
+        gltf_data['materials'].append(material)
+    return(gltf_data)
+
+def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = False, ani_struct = False, write_glb = True):
     gltf_data = {}
     gltf_data['asset'] = { 'version': '2.0' }
     gltf_data['accessors'] = []
@@ -293,14 +324,21 @@ def write_glTF(filename, skel_struct, mesh_struct = False, ani_struct = False):
     gltf_data['buffers'] = []
     if not mesh_struct == False:
         gltf_data['meshes'] = []
+        gltf_data['materials'] = []
     gltf_data['nodes'] = []
+    if not mesh_struct == False:
+        gltf_data['samplers'] = []
     gltf_data['scenes'] = [{}]
     gltf_data['scenes'][0]['nodes'] = [0]
     gltf_data['scene'] = 0
     gltf_data['skins'] = []
+    if not mesh_struct == False:
+        gltf_data['textures'] = []
     giant_buffer = bytes()
     mesh_nodes = []
     buffer_view = 0
+    if not material_struct == False:
+        gltf_data = generate_materials(gltf_data, material_struct)
     for i in range(len(skel_struct)):
         node = {'children': skel_struct[i]['children'], 'name': skel_struct[i]['name']}
         if 'pose_matrix' in skel_struct[i]:
@@ -412,6 +450,8 @@ def write_glTF(filename, skel_struct, mesh_struct = False, ani_struct = False):
                 ib_stream.close()
                 del(ib_stream)
                 primitive["mode"] = 4 #TRIANGLES
+                if mesh_struct['mesh_blocks'][i]['primitives'][j]['material_offset'] < len(gltf_data['materials']):
+                    primitive["material"] = mesh_struct['mesh_blocks'][i]['primitives'][j]['material_offset']
                 mesh_nodes.append(len(gltf_data['nodes']))
                 gltf_data['nodes'].append({'mesh': len(gltf_data['meshes']), 'name': "Mesh_{0}_{1}".format(i,j)})
                 gltf_data['meshes'].append({"primitives": [primitive], "name": "Mesh_{0}_{1}".format(i,j)})
@@ -437,30 +477,42 @@ def write_glTF(filename, skel_struct, mesh_struct = False, ani_struct = False):
                 buffer_view += 1
                 giant_buffer += inv_mtx_buffer
         gltf_data['scenes'][0]['nodes'].extend(mesh_nodes)
-    gltf_data['buffers'].append({"byteLength": len(giant_buffer), "uri": filename[:-4]+'.bin'})
-    with open(filename[:-4]+'.bin', 'wb') as f:
-        f.write(giant_buffer)
-    with open(filename[:-4]+'.gltf', 'wb') as f:
-        f.write(json.dumps(gltf_data, indent=4).encode("utf-8"))
+    gltf_data['buffers'].append({"byteLength": len(giant_buffer)})
+    if write_glb == True:
+        with open(filename[:-4]+'.glb', 'wb') as f:
+            jsondata = json.dumps(gltf_data).encode('utf-8')
+            jsondata += b' ' * (4 - len(jsondata) % 4)
+            f.write(struct.pack('<III', 1179937895, 2, 12 + 8 + len(jsondata) + 8 + len(giant_buffer)))
+            f.write(struct.pack('<II', len(jsondata), 1313821514))
+            f.write(jsondata)
+            f.write(struct.pack('<II', len(giant_buffer), 5130562))
+            f.write(giant_buffer)
+    else:
+        gltf_data['buffers'][0]["uri"] = filename[:-4]+'.bin'
+        with open(filename[:-4]+'.bin', 'wb') as f:
+            f.write(giant_buffer)
+        with open(filename[:-4]+'.gltf', 'wb') as f:
+            f.write(json.dumps(gltf_data, indent=4).encode("utf-8"))
 
-def process_mdl (mdl_file, overwrite = False):
+def process_mdl (mdl_file, overwrite = False, write_glb = True):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
-    mdl_data = decryptCLE(mdl_data)
-    mesh_struct = obtain_mesh_data(mdl_data, trim_for_gpu = True)
-    skel_data = isolate_skeleton_data(mdl_data)
-    skel_struct = obtain_skeleton_data(skel_data)
-    ani_data = isolate_animation_data(mdl_data)
-    ani_struct = obtain_animation_data(ani_data)
-    if not ani_struct == False:
-        #skel_struct = apply_first_frame_as_pose(skel_struct, ani_struct)
-        ani_struct = calc_abs_ani_rotations(skel_struct, ani_struct)
-    if os.path.exists(mdl_file[:-4] + '.gltf') and (overwrite == False):
-        if str(input(mdl_file[:-4] + ".gltf exists! Overwrite? (y/N) ")).lower()[0:1] == 'y':
+    if (os.path.exists(mdl_file[:-4] + '.gltf') or os.path.exists(mdl_file[:-4] + '.glb')) and (overwrite == False):
+        if str(input(mdl_file[:-4] + ".glb/.gltf exists! Overwrite? (y/N) ")).lower()[0:1] == 'y':
             overwrite = True
-    if (overwrite == True) or not os.path.exists(mdl_file[:-4] + '.gltf'):
-        write_glTF(mdl_file, skel_struct, mesh_struct, ani_struct)
+    if (overwrite == True) or not (os.path.exists(mdl_file[:-4] + '.gltf') or os.path.exists(mdl_file[:-4] + '.glb')):
+        mdl_data = decryptCLE(mdl_data)
+        mesh_struct = obtain_mesh_data(mdl_data, trim_for_gpu = True)
+        material_struct = obtain_material_data(mdl_data)
+        skel_data = isolate_skeleton_data(mdl_data)
+        skel_struct = obtain_skeleton_data(skel_data)
+        ani_data = isolate_animation_data(mdl_data)
+        ani_struct = obtain_animation_data(ani_data)
+        if not ani_struct == False:
+            #skel_struct = apply_first_frame_as_pose(skel_struct, ani_struct)
+            ani_struct = calc_abs_ani_rotations(skel_struct, ani_struct)
+        write_glTF(mdl_file, skel_struct, mesh_struct, material_struct, ani_struct, write_glb = write_glb)
 
 if __name__ == "__main__":
     # Set current directory
@@ -471,10 +523,11 @@ if __name__ == "__main__":
         import argparse
         parser = argparse.ArgumentParser()
         parser.add_argument('-o', '--overwrite', help="Overwrite existing files", action="store_true")
+        parser.add_argument('-t', '--textformat', help="Write gltf instead of glb", action="store_false")
         parser.add_argument('mdl_filename', help="Name of mdl file to process.")
         args = parser.parse_args()
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
-            process_mdl(args.mdl_filename, overwrite = args.overwrite)
+            process_mdl(args.mdl_filename, overwrite = args.overwrite, write_glb = args.textformat)
     else:
         mdl_files = glob.glob('*.mdl')
         for i in range(len(mdl_files)):
