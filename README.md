@@ -118,6 +118,9 @@ Overwrite existing files without prompting.
 `-t, --textformat`
 Output .gltf/.bin format instead of .glb format.
 
+`-d, --dumpanidata`
+Dump all animation data (including unused channels and unknown floats) in a .json file.
+
 ### kuro_merge_model_into_animations.py
 Double click the python script to run, and it will attempt to merge each animation it finds with its base model.  Animations are detected as .glb (or .gltf) files with underscores in their names, and the base model is the prefix before the first underscore.  For example, if it finds chr5001_mot_walk.glb, it will attempt to merge into it chr5001.glb.  The original animation will be overwritten with the merged animation.
 

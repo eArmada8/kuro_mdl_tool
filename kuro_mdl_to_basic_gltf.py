@@ -194,8 +194,8 @@ def obtain_animation_data (animation_section_data):
             ani_block['inputs'] = [numpy.frombuffer(buffer[i*stride:i*stride+4],dtype='float32').tolist() for i in range(len(buffer)//stride)]
             ani_block['outputs'] = [numpy.frombuffer(buffer[i*stride+4:i*stride+4+key_stride[ani_block['type']]],\
                 dtype='float32').tolist() for i in range(len(buffer)//stride)]
-            #ani_block['unknown'] = [numpy.frombuffer(buffer[i*stride+4+key_stride[ani_block['type']]:(i+1)*stride],\
-                #dtype='float32').tolist() for i in range(len(buffer)//stride)]
+            ani_block['unknown'] = [numpy.frombuffer(buffer[i*stride+4+key_stride[ani_block['type']]:(i+1)*stride],\
+                dtype='float32').tolist() for i in range(len(buffer)//stride)]
             ani_struct.append(ani_block)
     return(ani_struct)
 
@@ -457,7 +457,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
         with open(filename[:-4]+'.gltf', 'wb') as f:
             f.write(json.dumps(gltf_data, indent=4).encode("utf-8"))
 
-def process_mdl (mdl_file, overwrite = False, write_glb = True):
+def process_mdl (mdl_file, overwrite = False, write_glb = True, dump_extra_animation_data = False):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
@@ -472,6 +472,8 @@ def process_mdl (mdl_file, overwrite = False, write_glb = True):
         ani_data = isolate_animation_data(mdl_data)
         ani_struct = obtain_animation_data(ani_data)
         if not ani_struct == False:
+            if dump_extra_animation_data == True:
+                write_struct_to_json(ani_struct,mdl_file[:-4]+"_extra")
             #skel_struct = apply_first_frame_as_pose(skel_struct, ani_struct)
             ani_struct = calc_abs_ani_rotations(skel_struct, ani_struct)
         write_glTF(mdl_file, skel_struct, mesh_struct, material_struct, ani_struct, write_glb = write_glb)
@@ -486,10 +488,12 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser()
         parser.add_argument('-o', '--overwrite', help="Overwrite existing files", action="store_true")
         parser.add_argument('-t', '--textformat', help="Write gltf instead of glb", action="store_false")
+        parser.add_argument('-d', '--dumpanidata', help="Write extra animation data to json", action="store_true")
         parser.add_argument('mdl_filename', help="Name of mdl file to process.")
         args = parser.parse_args()
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
-            process_mdl(args.mdl_filename, overwrite = args.overwrite, write_glb = args.textformat)
+            process_mdl(args.mdl_filename, overwrite = args.overwrite, write_glb = args.textformat,\
+                dump_extra_animation_data = args.dumpanidata)
     else:
         mdl_files = glob.glob('*.mdl')
         for i in range(len(mdl_files)):
