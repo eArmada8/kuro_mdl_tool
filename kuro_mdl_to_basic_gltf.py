@@ -327,7 +327,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                         "componentType": 5126,\
                         "count": len(ani_struct[i]['inputs']),\
                         "type": 'SCALAR',\
-                        "max": [max(ani_struct[i]['inputs'])], "min": [min(ani_struct[i]['inputs'])]})
+                        "max": max(ani_struct[i]['inputs']), "min": min(ani_struct[i]['inputs'])})
                     input_buffer = numpy.array(ani_struct[i]['inputs'],dtype='float32').tobytes()
                     gltf_data['bufferViews'].append({"buffer": 0,\
                         "byteOffset": len(giant_buffer),\
@@ -440,6 +440,13 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                 buffer_view += 1
                 giant_buffer += inv_mtx_buffer
             gltf_data['scenes'][0]['nodes'].append(mesh_node)
+    else:
+        skin = {}
+        skin['skeleton'] = 0
+        joints = [i for i in range(len(gltf_data['nodes'])) if i != 0]
+        if len(joints) > 0:
+            skin['joints'] = joints
+        gltf_data['skins'].append(skin)
     gltf_data['buffers'].append({"byteLength": len(giant_buffer)})
     if write_glb == True:
         with open(filename[:-4]+'.glb', 'wb') as f:
