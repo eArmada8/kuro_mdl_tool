@@ -372,7 +372,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                 for element in range(len(gltf_fmt['elements'])):
                     primitive["attributes"][gltf_fmt['elements'][element]['SemanticName']]\
                         = len(gltf_data['accessors'])
-                    gltf_data['accessors'].append({"bufferView" : buffer_view,\
+                    gltf_data['accessors'].append({"bufferView" : len(gltf_data['bufferViews']),\
                         "componentType": gltf_fmt['elements'][element]['componentType'],\
                         "count": len(submesh['vb'][element]['Buffer']),\
                         "type": gltf_fmt['elements'][element]['accessor_type']})
@@ -392,7 +392,6 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                         "target" : 34962})
                     block_offset += len(submesh['vb'][element]['Buffer']) *\
                         gltf_fmt['elements'][element]['componentStride']
-                    buffer_view += 1
                 vb_stream.seek(0)
                 giant_buffer += vb_stream.read()
                 vb_stream.close()
@@ -403,7 +402,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                 while (ib_stream.tell() % 4) > 0:
                     ib_stream.write(b'\x00')
                 primitive["indices"] = len(gltf_data['accessors'])
-                gltf_data['accessors'].append({"bufferView" : buffer_view,\
+                gltf_data['accessors'].append({"bufferView" : len(gltf_data['bufferViews']),\
                     "componentType": gltf_fmt['componentType'],\
                     "count": len([index for triangle in submesh['ib']['Buffer'] for index in triangle]),\
                     "type": gltf_fmt['accessor_type']})
@@ -411,7 +410,6 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                     "byteOffset": len(giant_buffer),\
                     "byteLength": ib_stream.tell(),\
                     "target" : 34963})
-                buffer_view += 1
                 ib_stream.seek(0)
                 giant_buffer += ib_stream.read()
                 ib_stream.close()
@@ -435,14 +433,13 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                     inv_mtx_buffer += struct.pack("<16f", *[num for row in inv_bind_mtx for num in row])
                 gltf_data['nodes'][mesh_node]['skin'] = len(gltf_data['skins'])
                 gltf_data['skins'].append({"inverseBindMatrices": len(gltf_data['accessors']), "joints": list(global_node_dict.values())})
-                gltf_data['accessors'].append({"bufferView" : buffer_view,\
+                gltf_data['accessors'].append({"bufferView" : len(gltf_data['bufferViews']),\
                     "componentType": 5126,\
                     "count": len(global_node_dict),\
                     "type": "MAT4"})
                 gltf_data['bufferViews'].append({"buffer": 0,\
                     "byteOffset": len(giant_buffer),\
                     "byteLength": len(inv_mtx_buffer)})
-                buffer_view += 1
                 giant_buffer += inv_mtx_buffer
             gltf_data['scenes'][0]['nodes'].append(mesh_node)
     else:
