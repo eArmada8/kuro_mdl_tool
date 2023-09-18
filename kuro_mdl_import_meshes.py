@@ -78,6 +78,7 @@ def build_skeleton_section (mdl_filename, kuro_ver = 1):
     try:
         skel_struct = read_struct_from_json(mdl_filename + "/skeleton.json")
     except:
+        print("{0}/skeleton.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_filename))
         with open(mdl_filename + '.mdl', "rb") as f:
             mdl_data = f.read()
         mdl_data = decryptCLE(mdl_data)
@@ -101,6 +102,7 @@ def build_material_section (mdl_filename, kuro_ver = 1):
     try:
         material_struct = read_struct_from_json(mdl_filename + "/material_info.json")
     except:
+        print("{0}/material_info.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_filename))
         with open(mdl_filename + '.mdl', "rb") as f:
             mdl_data = f.read()
         mdl_data = decryptCLE(mdl_data)
@@ -158,6 +160,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
     try:
         mesh_struct_metadata = read_struct_from_json(mdl_filename + "/mesh_info.json")
     except:
+        print("{0}/mesh_info.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_filename))
         with open(mdl_filename + '.mdl', "rb") as f:
             mdl_data = f.read()
         mdl_data = decryptCLE(mdl_data)
@@ -173,6 +176,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
         mesh_block = bytes()
         meshes = 0 # Keep count of actual meshes imported, in case some have been deleted
         safe_filename = "".join([x if x not in "\/:*?<>|" else "_" for x in mesh_struct_metadata[i]["name"]])
+        expected_vgmap = {mesh_struct_metadata[i]['nodes'][j]['name']:j for j in range(len(mesh_struct_metadata[i]['nodes']))}
         for j in range(len(mesh_struct_metadata[i]["primitives"])):
             try:
                 mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, safe_filename, j)
@@ -196,6 +200,16 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                     print("Submesh {0} not found, skipping...".format(mesh_filename))
                     continue
             print("Processing submesh {0}...".format(mesh_filename))
+            # VGMap sanity check - Make sure the .vgmap file matches the actual skin node tree
+            try:
+                vgmap = read_struct_from_json(mesh_filename + '.vgmap')
+                if not (all([True if x in expected_vgmap else False for x in vgmap])\
+                    and all([expected_vgmap[x] == vgmap[x] for x in vgmap])):
+                    print("Warning! {}.vgmap does not match the internal skin node tree!".format(mesh_filename))
+                    print("This model will likely have major animation distortions and may crash the game.")
+                    input("Press Enter to continue.")
+            except FileNotFoundError:
+                print("{}.vgmap not found, vertex group sanity check skipped.".format(mesh_filename))
             primitive_buffer = struct.pack("<I", mesh_struct_metadata[i]["primitives"][j]["material_offset"])
             if kuro_ver == 1:
                 primitive_buffer += struct.pack("<I", len(vb)+1)
@@ -309,7 +323,7 @@ def process_mdl (mdl_file, change_compression = False, force_kuro_version = Fals
         if json_kuro_ver > 0 and json_kuro_ver <= kuro_ver:
             kuro_ver = json_kuro_ver
     except:
-        pass
+        print("{0}/mdl_version.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_file[:-4]))
     # Command line option overrides JSON file
     if force_kuro_version != False and force_kuro_version < kuro_ver:
         kuro_ver = force_kuro_version
