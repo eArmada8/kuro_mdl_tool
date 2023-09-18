@@ -12,9 +12,14 @@
 #
 # GitHub eArmada8/misc_kiseki
 
-import io, struct, sys, os, glob, numpy, copy, json
-from pyquaternion import Quaternion
-from kuro_mdl_export_meshes import *
+try:
+    import io, struct, sys, os, glob, numpy, copy, json
+    from pyquaternion import Quaternion
+    from kuro_mdl_export_meshes import *
+except ModuleNotFoundError as e:
+    print("Python module missing! {}".format(e.msg))
+    input("Press Enter to abort.")
+    raise   
 
 # Adapted from Julian Uy's ED9 MDL parser, thank you
 def rpy2quat(rot_rpy): # Roll Pitch Yaw
@@ -487,7 +492,10 @@ def process_mdl (mdl_file, overwrite = False, write_glb = True, dump_extra_anima
 
 if __name__ == "__main__":
     # Set current directory
-    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+    if getattr(sys, 'frozen', False):
+        os.chdir(os.path.dirname(sys.executable))
+    else:
+        os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
     # If argument given, attempt to export from file in argument
     if len(sys.argv) > 1:

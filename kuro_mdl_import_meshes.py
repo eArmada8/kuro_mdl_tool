@@ -13,10 +13,15 @@
 #
 # GitHub eArmada8/misc_kiseki
 
-import io, struct, sys, os, shutil, glob, base64, json, blowfish, operator, zstandard
-from itertools import chain
-from lib_fmtibvb import *
-from kuro_mdl_export_meshes import *
+try:
+    import io, struct, sys, os, shutil, glob, base64, json, blowfish, operator, zstandard
+    from itertools import chain
+    from lib_fmtibvb import *
+    from kuro_mdl_export_meshes import *
+except ModuleNotFoundError as e:
+    print("Python module missing! {}".format(e.msg))
+    input("Press Enter to abort.")
+    raise   
 
 def compressCLE(file_content):
     magic = file_content[0:4]
@@ -329,7 +334,10 @@ def process_mdl (mdl_file, change_compression = False, force_kuro_version = Fals
 
 if __name__ == "__main__":
     # Set current directory
-    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+    if getattr(sys, 'frozen', False):
+        os.chdir(os.path.dirname(sys.executable))
+    else:
+        os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
     # If argument given, attempt to import into file in argument
     if len(sys.argv) > 1:

@@ -2,8 +2,13 @@
 #
 # GitHub eArmada8/ed8pkg2gltf
 
-import glob, os, json, struct, numpy, io, sys
-from pygltflib import *
+try:
+    import glob, os, json, struct, numpy, io, sys
+    from pygltflib import *
+except ModuleNotFoundError as e:
+    print("Python module missing! {}".format(e.msg))
+    input("Press Enter to abort.")
+    raise   
 
 def read_gltf_stream (gltf, accessor_num):
     accessor = gltf.accessors[accessor_num]

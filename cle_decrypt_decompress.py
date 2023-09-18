@@ -12,7 +12,12 @@
 # Thank you to authors of Kuro Tools for this decrypt function
 # https://github.com/nnguyen259/KuroTools
 
-import blowfish, struct, operator, zstandard, shutil, sys, os, glob
+try:
+    import blowfish, struct, operator, zstandard, shutil, sys, os, glob
+except ModuleNotFoundError as e:
+    print("Python module missing! {}".format(e.msg))
+    input("Press Enter to abort.")
+    raise   
 
 key = b"\x16\x4B\x7D\x0F\x4F\xA7\x4C\xAC\xD3\x7A\x06\xD9\xF8\x6D\x20\x94"
 IV = b"\x9D\x8F\x9D\xA1\x49\x60\xCC\x4C"
@@ -56,7 +61,11 @@ def processFile(cle_asset_filename):
 
 if __name__ == "__main__":
     # Set current directory
-    os.chdir(os.path.abspath(os.path.dirname(__file__)))
+    if getattr(sys, 'frozen', False):
+        os.chdir(os.path.dirname(sys.executable))
+    else:
+        os.chdir(os.path.abspath(os.path.dirname(__file__)))
+
     # If argument given, attempt to export from file in argument
     if len(sys.argv) > 1:
         import argparse
