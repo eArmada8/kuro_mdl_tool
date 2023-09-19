@@ -174,11 +174,11 @@ def parse_primitive_header (primitive_data):
     return(primitive_info)
             
 def obtain_mesh_data (mdl_data, material_struct, trim_for_gpu = False):
-    material_dict = {i:material_struct[i]['material_name'] for i in range(len(material_struct))}
     kuro_ver = get_kuro_ver(mdl_data)
     mesh_data = isolate_mesh_data(mdl_data)
     if mesh_data == False:
         return False
+    material_dict = {i:material_struct[i]['material_name'] for i in range(len(material_struct))}
     if kuro_ver > 1:
         primitive_data = isolate_primitive_data(mdl_data)
         primitive_info = parse_primitive_header(primitive_data)
