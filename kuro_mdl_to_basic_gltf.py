@@ -252,12 +252,12 @@ def generate_materials(gltf_data, material_struct):
     for i in range(len(material_struct)):
         material = { 'name': material_struct[i]['material_name'] }
         for j in range(len(material_struct[i]['textures'])):
-            if material_struct[i]['textures'][j]['unk_01'] in [0,1,2]:
-                wrapS = {0:10497,1:33648,2:33071}[material_struct[i]['textures'][j]['unk_01']]
+            if material_struct[i]['textures'][j]['wrapS'] in [0,1,2]:
+                wrapS = {0:10497,1:33648,2:33071}[material_struct[i]['textures'][j]['wrapS']]
             else:
                 wrapS = 10497
-            if material_struct[i]['textures'][j]['unk_02'] in [0,1,2]:
-                wrapT = {0:10497,1:33648,2:33071}[material_struct[i]['textures'][j]['unk_02']]
+            if material_struct[i]['textures'][j]['wrapT'] in [0,1,2]:
+                wrapT = {0:10497,1:33648,2:33071}[material_struct[i]['textures'][j]['wrapT']]
             else:
                 wrapT = 10497
             sampler = { 'wrapS': wrapS, 'wrapT': wrapT }
@@ -350,6 +350,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                     gltf_data['animations'][0]['channels'].append(channel)
                     gltf_data['animations'][0]['samplers'].append(sampler)
     if not mesh_struct == False:
+        material_dict = {gltf_data['materials'][i]['name']:i for i in range(len(gltf_data['materials']))}
         for i in range(len(mesh_struct["mesh_buffers"])): # Mesh
             if mesh_struct["mesh_blocks"][i]["node_count"] > 0:
                 has_skeleton = True
@@ -415,8 +416,8 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                 ib_stream.close()
                 del(ib_stream)
                 primitive["mode"] = 4 #TRIANGLES
-                if mesh_struct['mesh_blocks'][i]['primitives'][j]['material_offset'] < len(gltf_data['materials']):
-                    primitive["material"] = mesh_struct['mesh_blocks'][i]['primitives'][j]['material_offset']
+                if mesh_struct['mesh_blocks'][i]['primitives'][j]['material'] in material_dict:
+                    primitive["material"] = material_dict[mesh_struct['mesh_blocks'][i]['primitives'][j]['material']]
                 primitives.append(primitive)
                 del(submesh)
             mesh_node = [j for j in range(len(gltf_data['nodes']))\
@@ -475,8 +476,8 @@ def process_mdl (mdl_file, overwrite = False, write_glb = True, dump_extra_anima
             overwrite = True
     if (overwrite == True) or not (os.path.exists(mdl_file[:-4] + '.gltf') or os.path.exists(mdl_file[:-4] + '.glb')):
         mdl_data = decryptCLE(mdl_data)
-        mesh_struct = obtain_mesh_data(mdl_data, trim_for_gpu = True)
         material_struct = obtain_material_data(mdl_data)
+        mesh_struct = obtain_mesh_data(mdl_data, material_struct = material_struct, trim_for_gpu = True)
         skel_struct = process_skeleton_data(obtain_skeleton_data(mdl_data))
         ani_data = isolate_animation_data(mdl_data)
         ani_struct = obtain_animation_data(ani_data)

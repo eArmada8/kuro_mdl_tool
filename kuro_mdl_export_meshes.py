@@ -173,7 +173,8 @@ def parse_primitive_header (primitive_data):
             primitive_info.append(element)
     return(primitive_info)
             
-def obtain_mesh_data (mdl_data, trim_for_gpu = False):
+def obtain_mesh_data (mdl_data, material_struct, trim_for_gpu = False):
+    material_dict = {i:material_struct[i]['material_name'] for i in range(len(material_struct))}
     kuro_ver = get_kuro_ver(mdl_data)
     mesh_data = isolate_mesh_data(mdl_data)
     if mesh_data == False:
@@ -198,7 +199,7 @@ def obtain_mesh_data (mdl_data, trim_for_gpu = False):
             for j in range(mesh_block["primitive_count"]):
                 primitive = {}
                 primitive["id_referenceonly"] = j # Not used at all for repacking, purely for convenience
-                primitive["material_offset"], = struct.unpack("<I",f.read(4))
+                primitive["material"] = material_dict[struct.unpack("<I",f.read(4))[0]]
                 if kuro_ver == 1:
                     primitive["num_of_elements"], = struct.unpack("<I",f.read(4))
                 elif kuro_ver > 1:
@@ -401,7 +402,7 @@ def obtain_material_data (mdl_data):
                 texture_block['texture_slot'], = struct.unpack("<i",f.read(4))
                 if kuro_ver > 1:
                     texture_block['unk_00'], = struct.unpack("<i",f.read(4))
-                texture_block['unk_01'], texture_block['unk_02'] = struct.unpack("<2i",f.read(8))
+                texture_block['wrapS'], texture_block['wrapT'] = struct.unpack("<2i",f.read(8))
                 if kuro_ver > 1:
                     texture_block['unk_03'], = struct.unpack("<i",f.read(4))
                 material_block['textures'].append(texture_block)
@@ -481,10 +482,10 @@ def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
     mdl_data = decryptCLE(mdl_data)
-    mesh_struct = obtain_mesh_data(mdl_data, trim_for_gpu = trim_for_gpu)
-    mesh_json_filename = mdl_file[:-4] + '/mesh_info.json'
     material_struct = obtain_material_data(mdl_data)
     material_json_filename = mdl_file[:-4] + '/material_info.json'
+    mesh_struct = obtain_mesh_data(mdl_data, material_struct = material_struct, trim_for_gpu = trim_for_gpu)
+    mesh_json_filename = mdl_file[:-4] + '/mesh_info.json'
     skel_struct = obtain_skeleton_data(mdl_data)
     skel_json_filename = mdl_file[:-4] + '/skeleton.json'
     mdl_version_json_filename = mdl_file[:-4] + '/mdl_version.json'

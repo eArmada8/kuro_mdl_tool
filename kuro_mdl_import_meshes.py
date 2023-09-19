@@ -119,7 +119,7 @@ def build_material_section (mdl_filename, kuro_ver = 1):
                 + struct.pack("<i", material_struct[i]['textures'][j]['texture_slot'])
             if kuro_ver > 1:
                 texture_blocks += struct.pack("<i", material_struct[i]['textures'][j]['unk_00'])
-            texture_blocks += struct.pack("<2i", material_struct[i]['textures'][j]['unk_01'], material_struct[i]['textures'][j]['unk_02'])
+            texture_blocks += struct.pack("<2i", material_struct[i]['textures'][j]['wrapS'], material_struct[i]['textures'][j]['wrapT'])
             if kuro_ver > 1:
                 texture_blocks += struct.pack("<i", material_struct[i]['textures'][j]['unk_03'])
             texture_block_count += 1
@@ -155,6 +155,16 @@ def build_material_section (mdl_filename, kuro_ver = 1):
     return(struct.pack("<2I", 0, len(output_buffer)) + output_buffer)
 
 def build_mesh_section (mdl_filename, kuro_ver = 1):
+    # A little inefficient to read this twice, but it's very fast either way
+    try:
+        material_struct = read_struct_from_json(mdl_filename + "/material_info.json")
+    except:
+        print("{0}/material_info.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_filename))
+        with open(mdl_filename + '.mdl', "rb") as f:
+            mdl_data = f.read()
+        mdl_data = decryptCLE(mdl_data)
+        material_struct = obtain_material_data(mdl_data)
+    material_dict = {material_struct[i]['material_name']:i for i in range(len(material_struct))}
     # Ordinarily we do not need to parse the original file, but in case we do, we only want to do it once
     has_parsed_original_file = False
     try:
@@ -210,7 +220,12 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                     input("Press Enter to continue.")
             except FileNotFoundError:
                 print("{}.vgmap not found, vertex group sanity check skipped.".format(mesh_filename))
-            primitive_buffer = struct.pack("<I", mesh_struct_metadata[i]["primitives"][j]["material_offset"])
+            try:
+                primitive_buffer = struct.pack("<I", material_dict[mesh_struct_metadata[i]["primitives"][j]["material"]])
+            except KeyError:
+                print("KeyError: Material {0} does not exist in material_info.json!".format(mesh_struct_metadata[i]["primitives"][j]["material"]))
+                input("Press Enter to abort.")
+                raise
             if kuro_ver == 1:
                 primitive_buffer += struct.pack("<I", len(vb)+1)
             elif kuro_ver > 1:
@@ -329,7 +344,7 @@ def process_mdl (mdl_file, change_compression = False, force_kuro_version = Fals
         kuro_ver = force_kuro_version
     skeleton_data = build_skeleton_section(mdl_file[:-4], kuro_ver)
     material_data = build_material_section(mdl_file[:-4], kuro_ver)
-    mesh_data, primitive_data = build_mesh_section(mdl_file[:-4], kuro_ver)
+    mesh_data, primitive_data = build_mesh_section(mdl_file[:-4], kuro_ver = kuro_ver)
     new_mdl_data = insert_model_data(mdl_data, skeleton_data, material_data, mesh_data, primitive_data, kuro_ver)
     # Instead of overwriting backups, it will just tag a number onto the end
     backup_suffix = ''
