@@ -466,6 +466,9 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
             f.write(giant_buffer)
         with open(filename[:-4]+'.gltf', 'wb') as f:
             f.write(json.dumps(gltf_data, indent=4).encode("utf-8"))
+    with open(filename[:-4]+'.metadata', 'wb') as f:
+        f.write(json.dumps({ 'locators': [x['name'] for x in skel_struct if x['type'] == 0],\
+            'non_skin_meshes': [x['name'] for x in skel_struct if x['skin_mesh'] == 0] }, indent=4).encode("utf-8"))
 
 def process_mdl (mdl_file, overwrite = False, write_glb = True, dump_extra_animation_data = False):
     with open(mdl_file, "rb") as f:

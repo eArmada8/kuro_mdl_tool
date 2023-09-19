@@ -15,13 +15,21 @@ try:
     import numpy, math, json, os, sys, glob
     from pyquaternion import Quaternion
     from pygltflib import GLTF2
+    from lib_fmtibvb import read_struct_from_json
 except ModuleNotFoundError as e:
     print("Python module missing! {}".format(e.msg))
     input("Press Enter to abort.")
     raise   
 
-def build_skeleton_struct (model_gltf):
-    skin_joints = sorted(list(set([x for y in model_gltf.skins for x in y.joints])))
+def build_skeleton_struct (model_gltf, metadata = {}):
+    if 'locators' in metadata:
+        locators = metadata['locators']
+    else:
+        locators = False
+    if 'non_skin_meshes' in metadata:
+        skin_joints = [i for i in range(len(model_gltf.nodes)) if model_gltf.nodes[i].name not in metadata['non_skin_meshes']]
+    else:
+        skin_joints = sorted(list(set([x for y in model_gltf.skins for x in y.joints])))
     mesh_nodes = [i for i in range(len(model_gltf.nodes)) if model_gltf.nodes[i].mesh is not None]
     skel_struct = []
     for i in range(len(model_gltf.nodes)):
@@ -59,11 +67,17 @@ def build_skeleton_struct (model_gltf):
         if i in mesh_nodes:
             skel_node['type'] = 2
             skel_node['mesh_index'] = model_gltf.nodes[i].mesh
-        elif transform["rotation_euler_rpy"] == [0.0,0.0,0.0] and transform["scale"] == [1.0,1.0,1.0]:
-            skel_node['type'] = 0
-            skel_node['mesh_index'] = -1
         else:
-            skel_node['type'] = 1
+            if not locators == False:
+                if model_gltf.nodes[i].name in locators:
+                    skel_node['type'] = 0
+                else:
+                    skel_node['type'] = 1
+            else:
+                if transform["rotation_euler_rpy"] == [0.0,0.0,0.0] and transform["scale"] == [1.0,1.0,1.0]:
+                    skel_node['type'] = 0
+                else:
+                    skel_node['type'] = 1
             skel_node['mesh_index'] = -1
         skel_node['pos_xyz'] = transform["pos_xyz"]
         skel_node['unknown_quat'] = [0.0,0.0,0.0,1.0]
@@ -87,7 +101,11 @@ def process_gltf (gltf_filename):
     except:
         print("File {} not found, or is invalid, skipping...".format(gltf_filename))
         return False
-    skel_struct = build_skeleton_struct (model_gltf)
+    try:
+        metadata = read_struct_from_json(".".join(gltf_filename.split('.')[:-1])+".metadata")
+    except:
+        metadata = {}
+    skel_struct = build_skeleton_struct (model_gltf, metadata)
     with open(".".join(gltf_filename.split('.')[:-1])+'_skeleton.json', "wb") as f:
         f.write(json.dumps(skel_struct, indent=4).encode("utf-8"))    
     return True
