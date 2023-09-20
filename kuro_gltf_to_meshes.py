@@ -152,12 +152,17 @@ def dump_meshes (mesh_node, gltf, complete_maps = False):
                 if accessor is not None:
                     submesh['vb'].append({'SemanticName': Semantics[semantic][0], 'SemanticIndex': Semantics[semantic][1],\
                         'Buffer': read_stream(gltf, accessor)})
+                    dxgiformat = dxgi_format (gltf, accessor)
+                    accstride = accessor_stride(gltf, accessor)
+                    if semantic == 'JOINTS_0': # Kuro needs 128-bit blendindices, I believe
+                        dxgiformat = 'R32G32B32A32_UINT'
+                        accstride = 16
                     element = {'id': str(len(elements)), 'SemanticName': Semantics[semantic][0],\
-                                'SemanticIndex': Semantics[semantic][1], 'Format': dxgi_format (gltf, accessor),\
+                                'SemanticIndex': Semantics[semantic][1], 'Format': dxgiformat,\
                                 'InputSlot': '0', 'AlignedByteOffset': str(AlignedByteOffset),\
                                 'InputSlotClass': 'per-vertex', 'InstanceDataStepRate': '0'}
                     elements.append(element)
-                    AlignedByteOffset += accessor_stride(gltf, accessor)
+                    AlignedByteOffset += accstride
         if 'TANGENT' not in [x['SemanticName'] for x in submesh['vb']]:
             tangentBuf, binormalBuf = calc_tangents (submesh)
             submesh['vb'].append({'SemanticName': 'TANGENT', 'SemanticIndex': '0', 'Buffer': tangentBuf})
@@ -186,7 +191,7 @@ def dump_meshes (mesh_node, gltf, complete_maps = False):
                 submesh['vgmap'] = dict(vgmap)
         submesh['uvmap'] = [{'m_index':i*3, 'm_inputSet':i} for i in range(len([x for x in elements if x['SemanticName']=='TEXCOORD']))]
         if mesh.primitives[i].material is not None:
-            submesh['material'] = gltf.materials[mesh.primitives[i].material].name.split('-Skinned')[0]
+            submesh['material'] = gltf.materials[mesh.primitives[i].material].name
         else:
             submesh['material'] = 'None'
         submeshes.append(submesh)
