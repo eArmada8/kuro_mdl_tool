@@ -137,7 +137,8 @@ def dump_meshes (mesh_node, gltf, complete_maps = False):
         print("Reading mesh {0}...".format(submesh['name']))
         tops = {0: 'pointlist', 4: 'trianglelist', 5: 'trianglestrip'}
         submesh['fmt'] = {'stride': '0', 'topology': tops[mesh.primitives[i].mode],\
-            'format': "DXGI_FORMAT_{0}".format(dxgi_format(gltf, mesh.primitives[i].indices)), 'elements': []}
+            #'format': "DXGI_FORMAT_{0}".format(dxgi_format(gltf, mesh.primitives[i].indices)), 'elements': []}
+            'format': "DXGI_FORMAT_R32_UINT", 'elements': []} # Force 32-bit indices
         submesh['ib'] = [x for y in read_stream(gltf, mesh.primitives[i].indices) for x in y]
         submesh['vb'] = []
         elements = []
