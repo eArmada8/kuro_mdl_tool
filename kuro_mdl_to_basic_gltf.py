@@ -42,16 +42,25 @@ def calc_abs_rotation_position(bone, parent_bone):
     bone["abs_p"] = (numpy.array(qp.rotate(bone['pos_xyz'])) + parent_bone['abs_p']).tolist()
     return(bone)
 
+def process_child_node(skel_struct, i, parent):
+    skel_struct[i]['q_wxyz'] = rpy2quat(skel_struct[i]['rotation_euler_rpy'])
+    if parent == -1:
+        skel_struct[i]['parentID'] = -1
+        skel_struct[i]['abs_q'] = skel_struct[i]['q_wxyz']
+        skel_struct[i]['abs_p'] = skel_struct[i]['pos_xyz']
+    else:
+        skel_struct[i]['parentID'] = parent
+        skel_struct[i] = calc_abs_rotation_position(skel_struct[i], skel_struct[skel_struct[i]['parentID']])
+    for j in range(len(skel_struct[i]['children'])):
+        skel_struct = process_child_node(skel_struct, skel_struct[i]['children'][j], i)
+    return(skel_struct)
+
 def process_skeleton_data(skel_struct):
-    for i in range(len(skel_struct)):
-        skel_struct[i]['q_wxyz'] = rpy2quat(skel_struct[i]['rotation_euler_rpy'])
-        if i == 0:
-            skel_struct[i]['parentID'] = -1
-            skel_struct[i]['abs_q'] = skel_struct[i]['q_wxyz']
-            skel_struct[i]['abs_p'] = skel_struct[i]['pos_xyz']
-        else:
-            skel_struct[i]['parentID'] = [x['id_referenceonly'] for x in skel_struct if i in x['children']][0]
-            skel_struct[i] = calc_abs_rotation_position(skel_struct[i], skel_struct[skel_struct[i]['parentID']])  
+    # Find the root(s) - should always be one!
+    root_nodes = [i for i in range(len(skel_struct)) if i not in list(set([x for y in skel_struct for x in y['children']]))]
+    if len(root_nodes) > 0:
+        for i in range(len(root_nodes)):
+            skel_struct = process_child_node(skel_struct, root_nodes[i], -1)
     return(skel_struct)
 
 # This only handles formats compatible with Kuro MDL (Float, UINT)
