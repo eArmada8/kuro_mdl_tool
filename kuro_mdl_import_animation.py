@@ -75,7 +75,8 @@ def extract_animation (gltf, i = 0):
             raw_outputs = [Quaternion([x[3]]+x[0:3]) for x in outputs]
             diff_outputs = [list(base_r.inverse * x) for x in raw_outputs] #wxyz
             outputs = [x[1:4]+[x[0]] for x in diff_outputs] #xyzw
-        ani_block = {'name': target_node.name + '_' + gltf.animations[i].channels[j].target.path,\
+        ani_block = {'name': target_node.name + '_' + \
+            {'translation':'translate', 'rotation':'rotate', 'scale':'scale'}[gltf.animations[i].channels[j].target.path],\
             'bone': target_node.name, 'type': {'translation':9, 'rotation':10, 'scale':11}[gltf.animations[i].channels[j].target.path],\
             'num_keyframes': len(inputs), 'inputs': inputs, 'outputs': outputs, 'unknown': [[0.0,0.0,0.0,0.0,0.0] for i in range(len(inputs))]}
         # The most recent sampler is used for interpolation.  We can only use one anyway, since all the transformations are combined.
@@ -90,6 +91,8 @@ def build_animation_section (ani_struct):
         output_buffer += struct.pack("<4I", ani_struct[i]['type'], 0, 0, ani_struct[i]['num_keyframes'])
         output_buffer += numpy.array([ani_struct[i]['inputs'][j]+ani_struct[i]['outputs'][j]+[0.0,0.0,0.0,0.0,0.0] for j \
             in range(ani_struct[i]['num_keyframes'])],dtype='float32').flatten().tobytes()
+    timestamps = set([x for y in [x for y in ani_struct for x in y['inputs']] for x in y])
+    output_buffer += struct.pack("<2f", min(timestamps), max(timestamps))
     return(struct.pack("<2I", 3, len(output_buffer)) + output_buffer)
 
 def insert_animation_data (mdl_data, skeleton_section_data, animation_section_data):
