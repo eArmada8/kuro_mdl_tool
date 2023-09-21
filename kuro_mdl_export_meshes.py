@@ -59,6 +59,24 @@ def read_pascal_string(f):
     sz = int.from_bytes(f.read(1), byteorder="little")
     return f.read(sz)
 
+def mdl_contents (mdl_data):
+    with io.BytesIO(mdl_data) as f:
+        mdl_header = struct.unpack("<III",f.read(12))
+        if not mdl_header[0] == 0x204c444d:
+            sys.exit()
+        contents = []
+        while True:
+            current_offset = f.tell()
+            section_info = {}
+            try:
+                section_info["type"], section_info["size"] = struct.unpack("<II",f.read(8))
+            except:
+                break
+            section_info["section_start_offset"] = f.tell()
+            contents.append(section_info)
+            f.seek(section_info["size"],1) # Move forward to the next section
+        return([x['type'] for x in contents])
+
 def isolate_skeleton_data (mdl_data):
     with io.BytesIO(mdl_data) as f:
         mdl_header = struct.unpack("<III",f.read(12))

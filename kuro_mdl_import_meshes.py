@@ -73,7 +73,7 @@ def insert_model_data (mdl_data, skeleton_section_data, material_section_data, m
         new_mdl_data += f.read()
         return(new_mdl_data)
 
-def build_skeleton_section (mdl_filename, kuro_ver = 1):
+def build_skeleton_struct_from_mdl (mdl_filename):
     # Will read data from JSON file, or load original data from the mdl file if JSON is missing
     try:
         skel_struct = read_struct_from_json(mdl_filename + "/skeleton.json")
@@ -83,6 +83,9 @@ def build_skeleton_section (mdl_filename, kuro_ver = 1):
             mdl_data = f.read()
         mdl_data = decryptCLE(mdl_data)
         skel_struct = obtain_skeleton_data(mdl_data)
+    return(skel_struct)
+
+def build_skeleton_section (skel_struct):
     output_buffer = struct.pack("<I", len(skel_struct))
     for i in range(len(skel_struct)):
         output_buffer += make_pascal_string(skel_struct[i]['name'])
@@ -342,7 +345,7 @@ def process_mdl (mdl_file, change_compression = False, force_kuro_version = Fals
     # Command line option overrides JSON file
     if force_kuro_version != False and force_kuro_version < kuro_ver:
         kuro_ver = force_kuro_version
-    skeleton_data = build_skeleton_section(mdl_file[:-4], kuro_ver)
+    skeleton_data = build_skeleton_section(build_skeleton_struct_from_mdl(mdl_file[:-4]))
     material_data = build_material_section(mdl_file[:-4], kuro_ver)
     mesh_data, primitive_data = build_mesh_section(mdl_file[:-4], kuro_ver = kuro_ver)
     new_mdl_data = insert_model_data(mdl_data, skeleton_data, material_data, mesh_data, primitive_data, kuro_ver)
