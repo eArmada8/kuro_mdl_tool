@@ -23,7 +23,7 @@ kuro_mdl_import_meshes.py is dependent on both kuro_mdl_export_meshes.py and lib
 
 ## Usage:
 ### kuro_mdl_export_meshes.py
-Double click the python script and it will search the current folder for all .mdl files and export the meshes into a folder with the same name as the mdl file.  Additionally, it will output 4 JSON files, one with metadata from the mesh section, another with the data from the materials section, another with the skeleton, and a fourth with the MDL version.
+Double click the python script and it will search the current folder for all .mdl files and export the meshes into a folder with the same name as the mdl file.  Additionally, it will output 5 JSON files, one with metadata from the mesh section, another with the data from the materials section, another with the skeleton, and fourth with the MDL version, and (for convenience) a list of textures used by the MDL.
 
 **Command line arguments:**
 `kuro_mdl_export_meshes.py [-h] [-c] [-t] [-o] mdl_filename`
@@ -43,9 +43,9 @@ Overwrite existing files without prompting.
 **Complete VGMap Setting:**
 
 Many modders prefer that complete VGmaps is the default, rather than a command line option.  You can (permanently) change the default behavior by editing the python script itself.  There is a line at the top:
-`complete_vgmaps_default = True`
-which you can change to 
 `complete_vgmaps_default = False`
+which you can change to 
+`complete_vgmaps_default = True`
 This will also change the command line argument `-c, --completemaps` into `-p, --partialmaps` which you would call to enable non-empty group vgmaps instead.
 
 ### kuro_mdl_import_meshes.py
@@ -69,19 +69,19 @@ This option will tell the importer to force compile the MDL at a specific Kuro v
 
 If meshes are missing (.fmt/.ib/.vb files that have been deleted), then the script will insert an empty (invisible) mesh in its place.  Metadata does not need to be altered.
 
-The script only looks for mesh files that are listed in the JSON file.  If you want to add a new mesh, you will need to add metadata.  My script only reads the "material_offset" entry, everything else is automatically generated.  So a section added to the end of the "primitives" section like this will be sufficient:
+The script only looks for mesh files that are listed in the JSON file.  If you want to add a new mesh, you will need to add metadata.  My script only reads the "material" entry, everything else is automatically generated.  So a section added to the end of the "primitives" section like this will be sufficient:
 ```
             {
-                "material_offset": 0,
+                "material": "c03_metal",
             }
 ```
-Be sure to add a comma to the } for the section prior if you are using a text editor, or better yet use a dedicated JSON editor.  I actually recommend editing JSON in a dedicated editor, because python is not forgiving if you make mistakes with the JSON structure.  (Try https://jsoneditoronline.org)  Also, be sure to point material_offset to a real section in material_info.json.  You might want to create a new section, or use an existing one.
+Be sure to add a comma to the } for the section prior if you are using a text editor, or better yet use a dedicated JSON editor.  I actually recommend editing JSON in a dedicated editor, because python is not forgiving if you make mistakes with the JSON structure.  (Try https://jsoneditoronline.org)  Also, be sure to point material to a real section in material_info.json.  You might want to create a new section, or use an existing one.
 
 **Changing textures**
 
-First look inside mesh_info.json and find the mesh you want to edit.  Identify the group, then look inside primitives.  For example, if you want to edit the metadata for "2_woman01_body79_05.vb" then it will be inside group 2 (which is the 3rd group, 0 is the first), named "woman01_body79."  Inside "primitives" you will find mesh 5 (which is the 6th mesh, 0 is the first).  It will say "id_referenceonly": "5".  Under id_referenceonly is material_offset.  That is the material group you need to alter.
+First look inside mesh_info.json and find the mesh you want to edit.  Identify the group, then look inside primitives.  For example, if you want to edit the metadata for "2_woman01_body79_05.vb" then it will be inside group 2 (which is the 3rd group, 0 is the first), named "woman01_body79."  Inside "primitives" you will find mesh 5 (which is the 6th mesh, 0 is the first).  It will say "id_referenceonly": "5".  Under id_referenceonly is material.  That is the material entry you need to alter.
 
-Go to material_info.json, and go that section.  For example, if "material_offset" in mesh_info was 7, then go to section 7 (id_referenceonly will be 7).  Under textures, you can change the file names.  When changing the texture filenames, do not put ".dds".
+Go to material_info.json, and go that section.  For example, if "material" in mesh_info was "hair", then go to the section of material_info.json with the tag ```"material_name": "hair"```.  Under textures, you can change the file names.  When changing the texture filenames, do not put ".dds".
 
 *Notes:*
 - All the changes should be in material_info.json.  There is nothing worth changing in mesh_info.json.
@@ -90,16 +90,14 @@ Go to material_info.json, and go that section.  For example, if "material_offset
 
 **Changing shaders**
 
-Please see the instructions above for changing textures.  I have successfully changed a shader by copying material_name, shader_name, the entire shaders section, and the entire material_switches section from one section to the other.  I am not sure you need to copy all of these, but I have not tested enough.  Maybe it is enough to just add switches that you need (such as "SWITCH_ALPHATEST" to enable alpha) - I am just guessing.  If someone can do more testing, I would be happy to update this section.
+Please see the instructions above for changing textures.  We cannot create novel configurations of shaders, because they are already compiled in pre-determined configurations.  To create a new material, you must base it off of a valid configuration.  Copy the entire section from the model you want, and give it a unique "material_name".  *Do not change anything in "shader_name", "str3", or "material_switches" - if you need different switches then find an existing material with the switches that you need.*  Update the textures section as above to point to your textures.  The values for the "parameters" section can be changed, but you cannot add or remove the parameters themselves.  (For example, if your material has "rimLightColor_g" set to [0.627, 0.558, 0.504], you can change that value.  But if the material does not have "rimLightColor_g" at all, you cannot at it.  Nor can you remove the parameter entirely if you do not want rim lighting, for example.  Also, I do not believe you can change values for parameters that start with "Switch_".)
 
 *Notes:*
 - All the changes should be in material_info.json.  There is nothing worth changing in mesh_info.json.
 
 **Changing the skeleton**
 
-I do not recommend directly editing skeleton.json, although it certainly is possible.  It is better to generate a glTF file (see below), import into Blender using Bone Dir "Blender (best for re-importing)", and edit the skeleton there.  *Do not use the default Bone Dir setting, "Temperance (Average)", if you intend to export the skeleton!*  Export as .glb, then run kuro_gltf_to_skeleton.py to extract the skeleton.
-
-Clean up the resulting .json file and it can replace skeleton.json.  The most important thing to do is to open up the original skeleton.json, figure out the master mesh nodes that match the base names of your meshes (for example, in chr5001_c03, they are "chr5001_hair_setup2", "chr5001_shadow_setup" and "woman01_body79"), and copy over the "type" and "mesh_index" from the original.  Extra mesh nodes might also need to be removed.
+I do not recommend directly editing skeleton.json, although it certainly is possible (assuming you know how to do matrix math).  It is better to generate a glTF file (see below), import into Blender using Bone Dir "Blender (best for re-importing)", and edit the skeleton there.  *Do not use the default Bone Dir setting, "Temperance (Average)", if you intend to export the skeleton!*  Export as .glb, update the associated .metadata, then run kuro_gltf_to_meshes.py to extract your .glb model to meshes/json.  This will extract your new skeleton, along with new bone palettes and their associated bind matrices.
 
 ### kuro_mdl_to_basic_gltf.py
 Double click the python script to run and it will attempt to convert the MDL model into a basic glTF model, with skeleton (in .glb format).  This tool as written is for obtaining the skeleton for rigging the .fmt/.ib/.vb/.vgmap meshes from the export tool.  *The meshes included in the model are not particularly useful as they cannot be exported back to MDL,* just delete them and import the exported meshes (.fmt/.ib/.vb./vgmap) instead - the tool only includes meshes because Blender refuses to open a glTF file without meshes.  After importing the meshes, Ctrl-click on the armature and parent (Object -> Parent -> Armature Deform {without the extra options}).
@@ -130,8 +128,28 @@ Double click the python script to run, and it will attempt to merge each animati
 
 There are no command line options.
 
-### kuro_gltf_to_skeleton.py
-Double click the python script to run, and it will attempt to pull the skeleton out of each glTF file it finds (.glb or .gltf).  It will generate a gltf_filename_skeleton.json file for every gltf_filename.glb that it finds.  This is very experimental, and it is very likely that the file will need to be customized before use.  At the very least, "type" and "mesh_index" must be fixed for the base nodes of the meshes.  Extra nodes might also need to be removed.
+### kuro_gltf_to_meshes.py
+Double click the python script to run, and it will attempt to pull the meshes, skeleton and bone palettes out of each glTF file it finds (.glb or .gltf).  It will write to the same folder that kuro_mdl_export_meshes.py writes to.  This is very experimental, and it can only output in MDL v1 format (i.e. for Kuro 1, although CLE Kuro 2 accepts MDL v1 files).  It does not output materials, so use the material_info.json from kuro_mdl_export_meshes.py.
+
+**Command line arguments:**
+`kuro_gltf_to_meshes.py [-h] [-c] [-o] mdl_filename`
+
+`-h, --help`
+Shows help message.
+
+`-c, --completemaps`
+.vgmap files will have the entire skeleton, with every bone available to the mesh, included with each mesh.  This will result in many empty vertex groups upon import into Blender.  The default behavior is to only include vertex groups that contain at least one vertex.  Complete maps are primarily useful when merging one mesh into another.
+
+`-o, --overwrite`
+Overwrite existing files without prompting.
+
+**Complete VGMap Setting:**
+
+Many modders prefer that complete VGmaps is the default, rather than a command line option.  You can (permanently) change the default behavior by editing the python script itself.  There is a line at the top:
+`complete_vgmaps_default = False`
+which you can change to 
+`complete_vgmaps_default = True`
+This will also change the command line argument `-c, --completemaps` into `-p, --partialmaps` which you would call to enable non-empty group vgmaps instead.
 
 ### cle_compress.py
 This script will compress files with zstandard so they can be used in Kuro no Kiseki 2 (CLE release).  If double-clicked, it will compress all files it finds in the current directory, assuming they are not .py, .bak, or already compressed.  This is not necessary with output from the importer since the files are already compressed, but would be needed for textures, etc.
