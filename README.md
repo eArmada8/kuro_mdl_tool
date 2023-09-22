@@ -85,7 +85,7 @@ Go to material_info.json, and go that section.  For example, if "material" in me
 
 *Notes:*
 - All the changes should be in material_info.json.  There is nothing worth changing in mesh_info.json.
-- When making mods with new textures, I highly recommend giving them unique names, instead of asking the user to overwrite textures that already exist.  That way, you do not have to worry about when two or more models use the same textures.  You should be able to add new texture slots or delete old ones as well (for example adding normal or gradient maps to meshes that did not have them before), just carefully copy from other meshes.  *Kuro 2 requires that the new textures have the same filename length as the original textures.
+- When making mods with new textures, I highly recommend giving them unique names, instead of asking the user to overwrite textures that already exist.  That way, you do not have to worry about when two or more models use the same textures.  You should be able to add new texture slots or delete old ones as well (for example adding normal or gradient maps to meshes that did not have them before), just carefully copy from other meshes.  *Kuro 2 requires that the new textures have the same filename length as the original textures.*
 - The textures that come with the CLE release are compressed.  Use cle_decrypt_decompress.py.  Kuro 1 will read uncompressed dds files; Kuro 2 will crash with uncompressed dds files.  Use cle_compress.py to compress the texture files before use.
 
 **Changing shaders**
@@ -94,6 +94,7 @@ Please see the instructions above for changing textures.  We cannot create novel
 
 *Notes:*
 - All the changes should be in material_info.json.  There is nothing worth changing in mesh_info.json.
+- Changing shaders in CLE 2 Kuro results in crashes.
 
 **Changing the skeleton**
 
@@ -126,6 +127,8 @@ Dump all animation data (including unused channels and unknown floats) in a .jso
 ### kuro_merge_model_into_animations.py
 Double click the python script to run, and it will attempt to merge each animation it finds with its base model.  Animations are detected as .glb (or .gltf) files with underscores in their names, and the base model is the prefix before the first underscore.  For example, if it finds chr5001_mot_walk.glb, it will attempt to merge into it chr5001.glb.  The original animation will be overwritten with the merged animation.  This tool only supports translation, rotation and scale animation channels.
 
+*Note that it will assume that the model is the .glb with the basename.  If you want to merge into a costume, such as chr5001_c03.glb for example, rename that file to the basename first (e.g. rename chr5001_c03.glb to chr5001.glb).
+
 There are no command line options.
 
 ### kuro_mdl_import_animation.py
@@ -134,6 +137,8 @@ Double click the python script and it will search the current folder for all .md
 Note that both kuro_mdl_import_meshes.py and kuro_mdl_import_animation.py will overwrite the skeleton.  For mdl files that have both model and animation data, I recommend running kuro_mdl_import_meshes.py first, then kuro_mdl_import_animation.py second, because Kuro calculates animation keyframes off the skeleton so they must be properly paired.  Be absolutely sure that the model is compatible with the skeleton from the animation.
 
 It will make a backup of the original, then overwrite the original.  It will not overwrite backups; for example if "model.mdl.bak" already exists, then it will write the backup to "model.mdl.bak1", then to "model.mdl.bak2", and so on.
+
+*Note: At this time, CLE Kuro 2 is not supported.  The custom animations are not able to pass the startup check and result in the infamous endless load screen.*
 
 **Command line arguments:**
 `kuro_mdl_import_animation.py [-h] [-c] mdl_filename`
