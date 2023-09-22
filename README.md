@@ -54,7 +54,7 @@ Double click the python script and it will search the current folder for all .md
 It will make a backup of the original, then overwrite the original.  It will not overwrite backups; for example if "model.mdl.bak" already exists, then it will write the backup to "model.mdl.bak1", then to "model.mdl.bak2", and so on.
 
 **Command line arguments:**
-`kuro_mdl_import_meshes.py [-h] mdl_filename`
+`kuro_mdl_import_meshes.py [-h] [-c] [-f] mdl_filename`
 
 `-h, --help`
 Shows help message.
@@ -104,12 +104,12 @@ Double click the python script to run and it will attempt to convert the MDL mod
 
 The script has basic texture support.  Place all the textures required in the same folder as the .glb file, in .dds format.  Blender does not support BC7 textures, so convert to BC1/BC3 first.
 
-Animations will also be converted into glTF (in .glb format).  The glb files can be directly imported into Blender, but Bone Dir must be set to "Blender (best for re-importing)" upon import or the skeleton will be altered irreversibly, preventing the animation from being used in the game.  (Repacking animations is not yet supported.)  Using the files directly is not recommended; instead decompile the base model as well, and put the .glb file in the same folder with the animations and run kuro_merge_model_into_animations.py in that folder. It will insert the model data including meshes / skins / texture references etc into the animation .glb, which will make animation feasible.
+Animations will also be converted into glTF (in .glb format).  The glb files can be directly imported into Blender, but Bone Dir must be set to "Blender (best for re-importing)" upon import or the skeleton will be altered irreversibly, preventing the animation from being used in the game.  (Repacking animations is not yet supported.)  Using the files directly is not recommended; instead decompile the base model as well, and put the .glb file in the same folder with the animations and run kuro_merge_model_into_animations.py in that folder. It will insert the model data including meshes / skins / texture references etc into the animation .glb, which will make animation feasible.  This tool only supports translation, rotation and scale animation channels.  *If you run this tool on an animation that exclusively utilizes the shader varying or uv scrolling channels, you will end up with an empty .glb.  You can examine the unsupported channels in json format using the --dumpanidata command.*
 
 It will search the current folder for mdl files and convert them all, unless you use command line options.
 
 **Command line arguments:**
-`kuro_mdl_to_basic_gltf.py [-h] [-o] mdl_filename`
+`kuro_mdl_to_basic_gltf.py [-h] [-o] [-t] [-d] mdl_filename`
 
 `-h, --help`
 Shows help message.
@@ -124,9 +124,25 @@ Output .gltf/.bin format instead of .glb format.
 Dump all animation data (including unused channels and unknown floats) in a .json file.
 
 ### kuro_merge_model_into_animations.py
-Double click the python script to run, and it will attempt to merge each animation it finds with its base model.  Animations are detected as .glb (or .gltf) files with underscores in their names, and the base model is the prefix before the first underscore.  For example, if it finds chr5001_mot_walk.glb, it will attempt to merge into it chr5001.glb.  The original animation will be overwritten with the merged animation.
+Double click the python script to run, and it will attempt to merge each animation it finds with its base model.  Animations are detected as .glb (or .gltf) files with underscores in their names, and the base model is the prefix before the first underscore.  For example, if it finds chr5001_mot_walk.glb, it will attempt to merge into it chr5001.glb.  The original animation will be overwritten with the merged animation.  This tool only supports translation, rotation and scale animation channels.
 
 There are no command line options.
+
+### kuro_mdl_import_animation.py
+Double click the python script and it will search the current folder for all .mdl files with exported gltf/glb files and animations within the .mdl file, and import the animation (and skeleton) from the gltf/glb file back into the mdl file.  Additionally, it will parse the .metadata JSON file if available and use that information to properly rebuild the skeleton section.  This script requires a working mdl file already be present as it does not reconstruct the entire file; only the known relevant sections.  The remaining parts of the file (any mesh or material data, etc) are copied unaltered from the intact mdl file.  By default, it will apply zstandard compression to the final file if the original file is compressed.  This tool only supports translation, rotation and scale animation channels.
+
+Note that both kuro_mdl_import_meshes.py and kuro_mdl_import_animation.py will overwrite the skeleton.  For mdl files that have both model and animation data, I recommend running kuro_mdl_import_meshes.py first, then kuro_mdl_import_animation.py second, because Kuro calculates animation keyframes off the skeleton so they must be properly paired.  Be absolutely sure that the model is compatible with the skeleton from the animation.
+
+It will make a backup of the original, then overwrite the original.  It will not overwrite backups; for example if "model.mdl.bak" already exists, then it will write the backup to "model.mdl.bak1", then to "model.mdl.bak2", and so on.
+
+**Command line arguments:**
+`kuro_mdl_import_animation.py [-h] [-c] mdl_filename`
+
+`-h, --help`
+Shows help message.
+
+`-c, --change_compression`
+By default, the import script will detect if the current (pre-import) mdl file has CLE zstandard compression applied, and will compress the new file only if the current file is compressed.  Using this option will force the script to change the compression (*e.g.* it will change the output from compressed to non-compressed, or from non-compressed to compressed).
 
 ### kuro_gltf_to_meshes.py
 Double click the python script to run, and it will attempt to pull the meshes, skeleton and bone palettes out of each glTF file it finds (.glb or .gltf).  It will write to the same folder that kuro_mdl_export_meshes.py writes to.  This is very experimental, and it can only output in MDL v1 format (i.e. for Kuro 1, although CLE Kuro 2 accepts MDL v1 files).  It does not output materials, so use the material_info.json from kuro_mdl_export_meshes.py.
