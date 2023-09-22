@@ -1,6 +1,6 @@
-# Tool to push a gltf model into animations.  A companion to ed8pkg2gltf.py.
+# Tool to push a gltf model into animations.  A companion to kuro_mdl_to_basic_gltf.py.
 #
-# GitHub eArmada8/ed8pkg2gltf
+# GitHub eArmada8/kuro_mdl_tool
 
 try:
     import glob, os, json, struct, numpy, io, sys

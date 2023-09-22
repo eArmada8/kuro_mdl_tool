@@ -10,7 +10,7 @@
 # These can be installed by:
 # /path/to/python3 -m pip install blowfish zstandard
 #
-# GitHub eArmada8/misc_kiseki
+# GitHub eArmada8/kuro_mdl_tool
 
 try:
     import io, struct, sys, os, glob, base64, json, blowfish, operator, zstandard
@@ -502,6 +502,8 @@ def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu
     mdl_data = decryptCLE(mdl_data)
     material_struct = obtain_material_data(mdl_data)
     material_json_filename = mdl_file[:-4] + '/material_info.json'
+    image_list = sorted(list(set([x['texture_image_name']+'.dds' for y in material_struct for x in y['textures']])))
+    image_json_filename = mdl_file[:-4] + '/image_list.json'
     mesh_struct = obtain_mesh_data(mdl_data, material_struct = material_struct, trim_for_gpu = trim_for_gpu)
     mesh_json_filename = mdl_file[:-4] + '/mesh_info.json'
     skel_struct = obtain_skeleton_data(mdl_data)
@@ -522,6 +524,8 @@ def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu
             f.write(json.dumps(mesh_struct["mesh_blocks"], indent=4).encode("utf-8"))
         with open(material_json_filename, 'wb') as f:
             f.write(json.dumps(material_struct, indent=4).encode("utf-8"))
+        with open(image_json_filename, 'wb') as f:
+            f.write(json.dumps(image_list, indent=4).encode("utf-8"))
         with open(skel_json_filename, 'wb') as f:
             f.write(json.dumps(skel_struct, indent=4).encode("utf-8"))
         for i in range(len(mesh_struct["mesh_buffers"])):

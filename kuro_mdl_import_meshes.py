@@ -11,7 +11,7 @@
 # These can be installed by:
 # /path/to/python3 -m pip install blowfish zstandard
 #
-# GitHub eArmada8/misc_kiseki
+# GitHub eArmada8/kuro_mdl_tool
 
 try:
     import io, struct, sys, os, shutil, glob, base64, json, blowfish, operator, zstandard
