@@ -138,7 +138,7 @@ Note that both kuro_mdl_import_meshes.py and kuro_mdl_import_animation.py will o
 
 It will make a backup of the original, then overwrite the original.  It will not overwrite backups; for example if "model.mdl.bak" already exists, then it will write the backup to "model.mdl.bak1", then to "model.mdl.bak2", and so on.
 
-*Note: At this time, CLE Kuro 2 is not supported.  The custom animations are not able to pass the startup check and result in the infamous endless load screen.*
+*Note: Animations in MDL version 2 format are auto-downgraded to version 1, as v2 custom animations in CLE Kuro 2 are not able to pass the startup check and result in the infamous endless load screen.  This script can only auto-downgrade pure animations, not model+animation mdls.  For the latter, use kuro_mdl_export_meshes.py / kuro_mdl_import_meshes.py and manually downgrade the .mdl before importing the animation.*
 
 **Command line arguments:**
 `kuro_mdl_import_animation.py [-h] [-c] mdl_filename`
