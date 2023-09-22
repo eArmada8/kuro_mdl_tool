@@ -1,6 +1,10 @@
 # Kuro MDL mesh export and import
 A pair of scripts to get the mesh data out of MDL files and back into MDL files.  The output is in .fmt/.vb/.ib files that are compatible with DarkStarSword Blender import plugin for 3DMigoto, and metadata is in JSON format.
 
+## Tutorials:
+
+Please see the [wiki](https://github.com/eArmada8/kuro_mdl_tool/wiki), and the detailed documentation below.
+
 ## Credits:
 99.9% of my understanding of the MDL format comes from the reverse engineering work of Julian Uy (github.com/uyjulian), and specifically his MDL to GLTF convertor: https://gist.github.com/uyjulian/9a9d6395682dac55d113b503b1172009
 
