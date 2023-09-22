@@ -502,8 +502,6 @@ def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu
     mdl_data = decryptCLE(mdl_data)
     material_struct = obtain_material_data(mdl_data)
     material_json_filename = mdl_file[:-4] + '/material_info.json'
-    image_list = sorted(list(set([x['texture_image_name']+'.dds' for y in material_struct for x in y['textures']])))
-    image_json_filename = mdl_file[:-4] + '/image_list.json'
     mesh_struct = obtain_mesh_data(mdl_data, material_struct = material_struct, trim_for_gpu = trim_for_gpu)
     mesh_json_filename = mdl_file[:-4] + '/mesh_info.json'
     skel_struct = obtain_skeleton_data(mdl_data)
@@ -512,6 +510,8 @@ def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu
     if mesh_struct == False and material_struct == False:
         print ("Skipping {0} as it lacks mesh and material data.".format(mdl_file))
         return False
+    image_list = sorted(list(set([x['texture_image_name']+'.dds' for y in material_struct for x in y['textures']])))
+    image_json_filename = mdl_file[:-4] + '/image_list.json'
     if os.path.exists(mdl_file[:-4]) and (os.path.isdir(mdl_file[:-4])) and (overwrite == False):
         if str(input(mdl_file[:-4] + " folder exists! Overwrite? (y/N) ")).lower()[0:1] == 'y':
             overwrite = True
