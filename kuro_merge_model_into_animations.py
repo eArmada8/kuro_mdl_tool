@@ -126,9 +126,12 @@ def process_animation (animation):
         ani_filename = animation+'.glb'
         output = 'GLB'
     else:
-        print("Animation {} not found, skipping...".format(animation))
+        print("glTF file for {} not found, skipping...".format(animation))
         return False
     ani_gltf = GLTF2().load(ani_filename)
+    if ani_gltf.animations is None or len(ani_gltf.animations) < 1:
+        print("Animation {} not found, skipping...".format(animation))
+        return False
     if len(ani_filename.split('_')) > 1:
         model_filename = ani_filename.split('_')[0]
         if os.path.exists(model_filename+'.glb'):
