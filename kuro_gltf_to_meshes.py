@@ -198,6 +198,14 @@ def dump_meshes (mesh_node, gltf, complete_maps = False):
         submeshes.append(submesh)
     return(submeshes)
 
+# Recursive function to reorder the nodes in hierarchical order
+def find_new_node_id (model_gltf, new_to_old_node_ids, i):
+    new_to_old_node_ids.append(i)
+    if getattr(model_gltf.nodes[i], 'children') is not None:
+        for j in range(len(model_gltf.nodes[i].children)):
+            new_to_old_node_ids = find_new_node_id (model_gltf, new_to_old_node_ids, model_gltf.nodes[i].children[j])
+    return(new_to_old_node_ids)
+
 def build_skeleton_struct (model_gltf, metadata = {}):
     if 'locators' in metadata:
         locators = metadata['locators']
@@ -209,10 +217,20 @@ def build_skeleton_struct (model_gltf, metadata = {}):
         skin_joints = sorted(list(set([x for y in model_gltf.skins for x in y.joints])))
     mesh_nodes = [i for i in range(len(model_gltf.nodes)) if model_gltf.nodes[i].mesh is not None]
     skel_struct = []
-    for i in range(len(model_gltf.nodes)):
-        skel_node = { "id_referenceonly": i, "name": model_gltf.nodes[i].name }
+    #Need to reorder nodes so that the root node is on top
+    top_nodes = [i for i in range(len(model_gltf.nodes)) if i not in \
+        list(set([x for y in [x.children if getattr(x, 'children') is not None else [] for x in model_gltf.nodes] for x in y]))]
+    if len(top_nodes) > 0: # Should always be 1
+        new_to_old_node_ids = []
+        for i in range(len(top_nodes)):
+            new_to_old_node_ids = find_new_node_id(model_gltf, new_to_old_node_ids, top_nodes[i])
+    else: # Should never happen, but I'll put this here just in case
+        new_to_old_node_ids = list(range(len(model_gltf.nodes)))
+    old_to_new_node_ids = {new_to_old_node_ids[i]:i for i in range(len(new_to_old_node_ids))}
+    for i in range(len(new_to_old_node_ids)):
+        skel_node = { "id_referenceonly": i, "name": model_gltf.nodes[new_to_old_node_ids[i]].name }
         transform = {}
-        if model_gltf.nodes[i].matrix is not None:
+        if model_gltf.nodes[new_to_old_node_ids[i]].matrix is not None:
                 transform["pos_xyz"] = model_gltf.nodes[j].matrix[12:15]
                 transform["scale"] = [numpy.linalg.norm(model_gltf.nodes[j].matrix[0:3]),\
                     numpy.linalg.norm(model_gltf.nodes[j].matrix[4:7]),\
@@ -225,28 +243,28 @@ def build_skeleton_struct (model_gltf, metadata = {}):
                     math.asin(-2.0*(q[1]*q[3] - q[0]*q[2])),\
                     math.atan2(2.0*(q[1]*q[2] + q[0]*q[3]), q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3])]
         else:
-            if model_gltf.nodes[i].translation is not None:
-                transform["pos_xyz"] = model_gltf.nodes[i].translation
+            if model_gltf.nodes[new_to_old_node_ids[i]].translation is not None:
+                transform["pos_xyz"] = model_gltf.nodes[new_to_old_node_ids[i]].translation
             else:
                 transform["pos_xyz"] = [0.0,0.0,0.0]
-            if model_gltf.nodes[i].rotation is not None:
-                q = Quaternion(model_gltf.nodes[i].rotation[3], model_gltf.nodes[i].rotation[0],\
-                    model_gltf.nodes[i].rotation[1], model_gltf.nodes[i].rotation[2])
+            if model_gltf.nodes[new_to_old_node_ids[i]].rotation is not None:
+                q = Quaternion(model_gltf.nodes[new_to_old_node_ids[i]].rotation[3], model_gltf.nodes[new_to_old_node_ids[i]].rotation[0],\
+                    model_gltf.nodes[new_to_old_node_ids[i]].rotation[1], model_gltf.nodes[new_to_old_node_ids[i]].rotation[2])
                 transform["rotation_euler_rpy"] = [math.atan2(2.0*(q[2]*q[3] + q[0]*q[1]), q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3]),\
                     math.asin(-2.0*(q[1]*q[3] - q[0]*q[2])),\
                     math.atan2(2.0*(q[1]*q[2] + q[0]*q[3]), q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3])]
             else:
                 transform["rotation_euler_rpy"] = [0.0,0.0,0.0]
-            if model_gltf.nodes[i].scale is not None:
-                transform["scale"] = model_gltf.nodes[i].scale
+            if model_gltf.nodes[new_to_old_node_ids[i]].scale is not None:
+                transform["scale"] = model_gltf.nodes[new_to_old_node_ids[i]].scale
             else:
                 transform["scale"] = [1.0,1.0,1.0]
-        if i in mesh_nodes:
+        if new_to_old_node_ids[i] in mesh_nodes:
             skel_node['type'] = 2
-            skel_node['mesh_index'] = model_gltf.nodes[i].mesh
+            skel_node['mesh_index'] = model_gltf.nodes[new_to_old_node_ids[i]].mesh
         else:
             if not locators == False:
-                if model_gltf.nodes[i].name in locators:
+                if model_gltf.nodes[new_to_old_node_ids[i]].name in locators:
                     skel_node['type'] = 0
                 else:
                     skel_node['type'] = 1
@@ -258,7 +276,7 @@ def build_skeleton_struct (model_gltf, metadata = {}):
             skel_node['mesh_index'] = -1
         skel_node['pos_xyz'] = transform["pos_xyz"]
         skel_node['unknown_quat'] = [0.0,0.0,0.0,1.0]
-        if i in skin_joints:
+        if new_to_old_node_ids[i] in skin_joints:
             skel_node['skin_mesh'] = 2
         else:
             skel_node['skin_mesh'] = 0
@@ -266,8 +284,8 @@ def build_skeleton_struct (model_gltf, metadata = {}):
         skel_node['scale'] = transform["scale"]
         skel_node['unknown'] = [0.0,0.0,0.0]
         skel_node['children'] = []
-        if model_gltf.nodes[i].children is not None:
-            skel_node['children'] = model_gltf.nodes[i].children
+        if model_gltf.nodes[new_to_old_node_ids[i]].children is not None:
+            skel_node['children'] = [old_to_new_node_ids[j] for j in model_gltf.nodes[new_to_old_node_ids[i]].children]
         skel_struct.append(skel_node)
     return(skel_struct)
 

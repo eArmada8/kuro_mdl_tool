@@ -124,8 +124,8 @@ Output .gltf/.bin format instead of .glb format.
 `-d, --dumpanidata`
 Dump all animation data (including unused channels and unknown floats) in a .json file.
 
-`-c, --calc_ibm`
-Calculate inverse bind matrices for each skinned mesh, instead of using the bind matrices already in the mdl file.  Some models have incorrect matrices and this will correct them; however animations may also require resetting so in most circumstances this is not recommended.
+`-p, --preserve_bind_matrices`
+Use the bind matrices already in the mdl file, instead of calculating inverse bind matrices for each skinned mesh which is the default behavior.  This can do strange things to the models / animations, but may be necessary in some situations.
 
 ### kuro_merge_model_into_animations.py
 Double click the python script to run, and it will attempt to merge each animation it finds with its base model.  Animations are detected as .glb (or .gltf) files with underscores in their names, and the base model is the prefix before the first underscore.  For example, if it finds chr5001_mot_walk.glb, it will attempt to merge into it chr5001.glb.  The original animation will be overwritten with the merged animation.  This tool only supports translation, rotation and scale animation channels.

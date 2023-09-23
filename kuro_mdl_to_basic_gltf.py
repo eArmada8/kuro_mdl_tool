@@ -285,7 +285,7 @@ def generate_materials(gltf_data, material_struct):
         gltf_data['materials'].append(material)
     return(gltf_data)
 
-def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = False, ani_struct = False, write_glb = True, calc_ibm = False):
+def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = False, ani_struct = False, write_glb = True, calc_ibm = True):
     gltf_data = {}
     gltf_data['asset'] = { 'version': '2.0' }
     gltf_data['accessors'] = []
@@ -482,7 +482,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
         f.write(json.dumps({ 'locators': [x['name'] for x in skel_struct if x['type'] == 0],\
             'non_skin_meshes': [x['name'] for x in skel_struct if x['skin_mesh'] == 0] }, indent=4).encode("utf-8"))
 
-def process_mdl (mdl_file, overwrite = False, write_glb = True, dump_extra_animation_data = False, calc_ibm = False):
+def process_mdl (mdl_file, overwrite = False, write_glb = True, dump_extra_animation_data = False, calc_ibm = True):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
@@ -517,12 +517,12 @@ if __name__ == "__main__":
         parser.add_argument('-o', '--overwrite', help="Overwrite existing files", action="store_true")
         parser.add_argument('-t', '--textformat', help="Write gltf instead of glb", action="store_false")
         parser.add_argument('-d', '--dumpanidata', help="Write extra animation data to json", action="store_true")
-        parser.add_argument('-c', '--calc_ibm', help="Ignore bind matrices and calculate new ones", action="store_true")
+        parser.add_argument('-p', '--preserve_bind_matrices', help="Preserve mdl bind matrices instead of calculating new ones", action="store_false")
         parser.add_argument('mdl_filename', help="Name of mdl file to process.")
         args = parser.parse_args()
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
             process_mdl(args.mdl_filename, overwrite = args.overwrite, write_glb = args.textformat,\
-                dump_extra_animation_data = args.dumpanidata, calc_ibm = args.calc_ibm)
+                dump_extra_animation_data = args.dumpanidata, calc_ibm = args.preserve_bind_matrices)
     else:
         mdl_files = glob.glob('*.mdl')
         for i in range(len(mdl_files)):
