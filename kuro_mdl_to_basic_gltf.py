@@ -285,7 +285,7 @@ def generate_materials(gltf_data, material_struct):
         gltf_data['materials'].append(material)
     return(gltf_data)
 
-def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = False, ani_struct = False, write_glb = True):
+def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = False, ani_struct = False, write_glb = True, calc_ibm = False):
     gltf_data = {}
     gltf_data['asset'] = { 'version': '2.0' }
     gltf_data['accessors'] = []
@@ -434,7 +434,16 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
             gltf_data['nodes'][mesh_node]['mesh'] = len(gltf_data['meshes'])
             gltf_data['meshes'].append({"primitives": primitives, "name": mesh_struct["mesh_blocks"][i]["name"]})
             if has_skeleton:
-                inv_mtx_buffer = b''.join([numpy.linalg.inv(numpy.array(x["matrix"],dtype="float32").transpose()).flatten('F').tobytes() for x in mesh_struct["mesh_blocks"][i]["nodes"]])
+                if calc_ibm:
+                    inv_mtx_buffer = bytes()
+                    for k in global_node_dict:
+                        mtx = Quaternion(skel_struct[global_node_dict[k]]['abs_q']).transformation_matrix
+                        [mtx[0,3],mtx[1,3],mtx[2,3]] = skel_struct[global_node_dict[k]]['abs_p']
+                        inv_bind_mtx = numpy.linalg.inv(mtx)
+                        inv_bind_mtx = numpy.ndarray.transpose(inv_bind_mtx)
+                        inv_mtx_buffer += struct.pack("<16f", *[num for row in inv_bind_mtx for num in row])
+                else:
+                    inv_mtx_buffer = b''.join([numpy.linalg.inv(numpy.array(x["matrix"],dtype="float32").transpose()).flatten('F').tobytes() for x in mesh_struct["mesh_blocks"][i]["nodes"]])
                 gltf_data['nodes'][mesh_node]['skin'] = len(gltf_data['skins'])
                 gltf_data['skins'].append({"inverseBindMatrices": len(gltf_data['accessors']), "joints": list(global_node_dict.values())})
                 gltf_data['accessors'].append({"bufferView" : len(gltf_data['bufferViews']),\
@@ -473,7 +482,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
         f.write(json.dumps({ 'locators': [x['name'] for x in skel_struct if x['type'] == 0],\
             'non_skin_meshes': [x['name'] for x in skel_struct if x['skin_mesh'] == 0] }, indent=4).encode("utf-8"))
 
-def process_mdl (mdl_file, overwrite = False, write_glb = True, dump_extra_animation_data = False):
+def process_mdl (mdl_file, overwrite = False, write_glb = True, dump_extra_animation_data = False, calc_ibm = False):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
@@ -492,7 +501,7 @@ def process_mdl (mdl_file, overwrite = False, write_glb = True, dump_extra_anima
                 write_struct_to_json(ani_struct,mdl_file[:-4]+"_extra")
             #skel_struct = apply_first_frame_as_pose(skel_struct, ani_struct)
             ani_struct = calc_abs_ani_rotations(skel_struct, ani_struct)
-        write_glTF(mdl_file, skel_struct, mesh_struct, material_struct, ani_struct, write_glb = write_glb)
+        write_glTF(mdl_file, skel_struct, mesh_struct, material_struct, ani_struct, write_glb = write_glb, calc_ibm = calc_ibm)
 
 if __name__ == "__main__":
     # Set current directory
@@ -508,11 +517,12 @@ if __name__ == "__main__":
         parser.add_argument('-o', '--overwrite', help="Overwrite existing files", action="store_true")
         parser.add_argument('-t', '--textformat', help="Write gltf instead of glb", action="store_false")
         parser.add_argument('-d', '--dumpanidata', help="Write extra animation data to json", action="store_true")
+        parser.add_argument('-c', '--calc_ibm', help="Ignore bind matrices and calculate new ones", action="store_true")
         parser.add_argument('mdl_filename', help="Name of mdl file to process.")
         args = parser.parse_args()
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
             process_mdl(args.mdl_filename, overwrite = args.overwrite, write_glb = args.textformat,\
-                dump_extra_animation_data = args.dumpanidata)
+                dump_extra_animation_data = args.dumpanidata, calc_ibm = args.calc_ibm)
     else:
         mdl_files = glob.glob('*.mdl')
         for i in range(len(mdl_files)):
