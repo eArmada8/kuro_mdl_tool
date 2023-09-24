@@ -74,6 +74,17 @@ def dxgi_format (gltf, accessor_num):
         dxgi_format += elementtype[accessor.componentType]
     return(dxgi_format)
 
+def calc_rpy_from_q (q):
+    r = math.atan2(2.0*(q[2]*q[3] + q[0]*q[1]), q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3])
+    sin_p = -2.0*(q[1]*q[3] - q[0]*q[2])
+    while sin_p < -1.0:
+        sin_p += 1.0
+    while sin_p > 1.0:
+        sin_p -= 1.0
+    p = math.asin(sin_p)
+    y = math.atan2(2.0*(q[1]*q[2] + q[0]*q[3]), q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3])
+    return([r,p,y])
+
 #adapted from concept3d @ stackexchange, thank you!
 def calc_tangents (submesh):
     #If IB is flat list, convert to triangles
@@ -239,9 +250,7 @@ def build_skeleton_struct (model_gltf, metadata = {}):
                     (gltf.nodes[j].matrix[4:7]/transform["scale"][1]).tolist()+[0],\
                     (gltf.nodes[j].matrix[8:11]/transform["scale"][2]).tolist()+[0],[0,0,0,1]])
                 q = Quaternion(matrix=r)
-                transform["rotation_euler_rpy"] = [math.atan2(2.0*(q[2]*q[3] + q[0]*q[1]), q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3]),\
-                    math.asin(-2.0*(q[1]*q[3] - q[0]*q[2])),\
-                    math.atan2(2.0*(q[1]*q[2] + q[0]*q[3]), q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3])]
+                transform["rotation_euler_rpy"] = calc_rpy_from_q(q)
         else:
             if model_gltf.nodes[new_to_old_node_ids[i]].translation is not None:
                 transform["pos_xyz"] = model_gltf.nodes[new_to_old_node_ids[i]].translation
@@ -250,9 +259,7 @@ def build_skeleton_struct (model_gltf, metadata = {}):
             if model_gltf.nodes[new_to_old_node_ids[i]].rotation is not None:
                 q = Quaternion(model_gltf.nodes[new_to_old_node_ids[i]].rotation[3], model_gltf.nodes[new_to_old_node_ids[i]].rotation[0],\
                     model_gltf.nodes[new_to_old_node_ids[i]].rotation[1], model_gltf.nodes[new_to_old_node_ids[i]].rotation[2])
-                transform["rotation_euler_rpy"] = [math.atan2(2.0*(q[2]*q[3] + q[0]*q[1]), q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3]),\
-                    math.asin(-2.0*(q[1]*q[3] - q[0]*q[2])),\
-                    math.atan2(2.0*(q[1]*q[2] + q[0]*q[3]), q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3])]
+                transform["rotation_euler_rpy"] = calc_rpy_from_q(q)
             else:
                 transform["rotation_euler_rpy"] = [0.0,0.0,0.0]
             if model_gltf.nodes[new_to_old_node_ids[i]].scale is not None:
