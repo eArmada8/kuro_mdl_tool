@@ -72,9 +72,10 @@ def convert_format_for_gltf(dxgi_format):
         vec_format = re.findall("[0-9]+",dxgi_format_split[0])
         vec_bits = int(vec_format[0])
         vec_elements = len(vec_format)
-        if numtype == 'FLOAT':
+        if numtype in ['FLOAT', 'UNORM', 'SNORM']:
             componentType = 5126
             componentStride = len(re.findall('[0-9]+', dxgi_format)) * 4
+            dxgi_format = "".join(['R32','G32','B32','A32','D32'][0:componentStride//4]) + "_FLOAT"
         elif numtype == 'UINT':
             if vec_bits == 32:
                 componentType = 5125
@@ -156,6 +157,20 @@ def fix_weight_groups(submesh, global_node_dict):
             #if (new_submesh['vb'][weight_element_index]['Buffer'][i][j] < 0.0000001):
                 #new_submesh['vb'][weight_element_index]['Buffer'][i][j] = 0
     return(new_submesh)
+
+# glTF does not support VEC4 normals, strip off the last value if .mdl using R8G8B8A8_SNORM
+def fix_normal_length(submesh, gltf_fmt):
+    normal_element_index = int([x for x in gltf_fmt['elements'] if x['SemanticName'] == 'NORMAL'][0]['id'])
+    submesh['vb'][normal_element_index]['Buffer'] = [x[0:3] for x in submesh['vb'][normal_element_index]['Buffer']]
+    gltf_fmt['elements'][normal_element_index]['Format'] = 'R32G32B32_FLOAT'
+    gltf_fmt['elements'][normal_element_index]['componentStride'] = 12
+    gltf_fmt['elements'][normal_element_index]['accessor_type'] = 'VEC3'
+    # Fix offsets and stride
+    gltf_fmt['stride'] = 0
+    for i in range(len(gltf_fmt['elements'])):
+        gltf_fmt['elements'][i]['AlignedByteOffset'] = gltf_fmt['stride']
+        gltf_fmt['stride'] += gltf_fmt['elements'][i]['componentStride']
+    return(submesh, gltf_fmt)
 
 def fix_tangent_length(submesh):
     tangent_element_index = int([x for x in submesh['fmt']['elements'] if x['SemanticName'] == 'TANGENT'][0]['id'])
@@ -375,6 +390,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                 else:
                     submesh = mesh_struct["mesh_buffers"][i][j]
                 gltf_fmt = convert_fmt_for_gltf(make_fmt_struct(submesh))
+                submesh, gltf_fmt = fix_normal_length(submesh, gltf_fmt)
                 primitive = {"attributes":{}}
                 vb_stream = io.BytesIO()
                 write_vb_stream(submesh['vb'], vb_stream, gltf_fmt, e='<', interleave = False)

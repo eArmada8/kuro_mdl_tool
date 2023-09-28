@@ -49,10 +49,8 @@ def decryptCLE(file_content):
     return result
 
 def get_kuro_ver (mdl_data):
-    if mdl_data[4] == 1:
-        return(1)
-    else:
-        return(2)
+    kuro_ver, = struct.unpack("<I",mdl_data[4:8])
+    return(kuro_ver)
 
 # From Julian Uy's ED9 MDL parser, thank you
 def read_pascal_string(f):
@@ -247,10 +245,16 @@ def obtain_mesh_data (mdl_data, material_struct, trim_for_gpu = False):
                             element_type = 'f'
                         case 1:
                             element["Semantic"] = "NORMAL"
-                            element_type = 'f'
+                            if element["stride"] == 4:
+                                element_type = 'S'
+                            else:
+                                element_type = 'f'
                         case 2:
                             element["Semantic"] = "TANGENT"
-                            element_type = 'f'
+                            if element["stride"] == 4:
+                                element_type = 'S'
+                            else:
+                                element_type = 'f'
                         case 3:
                             element["Semantic"] = "COLOR"
                             if element["stride"] == 4:
@@ -308,6 +312,15 @@ def obtain_mesh_data (mdl_data, material_struct, trim_for_gpu = False):
                                 elif kuro_ver > 1:
                                     buffer_data.append([x / float_max for x in struct.unpack("<{0}B".format(int(element["stride"])), prim.read(element["stride"]))])
                                 format_string = "".join(format_colors[0:int(element["stride"])]) + "_UNORM"
+                        case 'S': #8-bit SNORM
+                            format_colors = ['R8','G8','B8','A8']
+                            float_max = ((2**(8-1))-1) #Assuming all SNORM is 8-bit
+                            for l in range(element["count"]):
+                                if kuro_ver == 1:
+                                    buffer_data.append([x / float_max for x in struct.unpack("<{0}b".format(int(element["stride"])), f.read(element["stride"]))])
+                                elif kuro_ver > 1:
+                                    buffer_data.append([x / float_max for x in struct.unpack("<{0}b".format(int(element["stride"])), prim.read(element["stride"]))])
+                                format_string = "".join(format_colors[0:int(element["stride"])]) + "_SNORM"
                     buffer["fmt"] = {"id": str(element_num),
                         "SemanticName": element["Semantic"],\
                         "SemanticIndex": str(element_index),\
