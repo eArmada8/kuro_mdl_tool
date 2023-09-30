@@ -128,11 +128,18 @@ Dump all animation data (including unused channels and unknown floats) in a .jso
 Use the bind matrices already in the mdl file, instead of calculating inverse bind matrices for each skinned mesh which is the default behavior.  This can do strange things to the models / animations, but may be necessary in some situations.
 
 ### kuro_merge_model_into_animations.py
-Double click the python script to run, and it will attempt to merge each animation it finds with its base model.  Animations are detected as .glb (or .gltf) files with underscores in their names, and the base model is the prefix before the first underscore.  For example, if it finds chr5001_mot_walk.glb, it will attempt to merge into it chr5001.glb.  The original animation will be overwritten with the merged animation.  This tool only supports translation, rotation and scale animation channels.
+Double click the python script to run, and it will attempt to merge each animation it finds with its base model.  Animations are detected as .glb (or .gltf) files with underscores in their names, and the base model is the prefix before the first underscore.  For example, if it finds chr5001_mot_walk.glb, it will attempt to merge into it chr5001.glb.  The original animation .glb will be overwritten with the merged animation .glb.  This tool only supports translation, rotation and scale animation channels.
 
-*Note that it will assume that the model is the .glb with the basename.  If you want to merge into a costume, such as chr5001_c03.glb for example, rename that file to the basename first (e.g. rename chr5001_c03.glb to chr5001.glb).
+*Note that it will first search for a model .glb with the basename; if it does not find one, it will try to find a costume.  For example, if chr5001.glb is not available, it will look for files such as chr5001_c03.glb and use the first one that it finds.
 
-There are no command line options.
+**Command line arguments:**
+`kuro_merge_model_into_animations.py [-h] [-k] model_filename animation_filename`
+
+`-h, --help`
+Shows help message.
+
+`-k, --keep_model_ani`
+Default behavior is to discard the animation that is in the model glTF, and replace it with the animation in the animation glTF.  Using this option will instead have the script append the animation.  Blender does not support multiple glTF animations so for Blender this option should not be used.  Also, this option will not work with kuro_mdl_import_animation.py.
 
 ### kuro_mdl_import_animation.py
 Double click the python script and it will search the current folder for all .mdl files with exported gltf/glb files and animations within the .mdl file, and import the animation (and skeleton) from the gltf/glb file back into the mdl file.  Additionally, it will parse the .metadata JSON file if available and use that information to properly rebuild the skeleton section.  This script requires a working mdl file already be present as it does not reconstruct the entire file; only the known relevant sections.  The remaining parts of the file (any mesh or material data, etc) are copied unaltered from the intact mdl file.  By default, it will apply zstandard compression to the final file if the original file is compressed.  This tool only supports translation, rotation and scale animation channels.
