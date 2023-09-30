@@ -39,7 +39,7 @@ def read_gltf_stream (gltf, accessor_num):
                 data[i] = [x / ((2**16)-1) for x in data[i]]
     return(data)
 
-def apply_animations_to_model_gltf (model_gltf, ani_gltf):
+def apply_animations_to_model_gltf (model_gltf, ani_gltf, remove_model_ani = True):
     # Apply animation pose to model
     for i in range(len(model_gltf.nodes)):
         if model_gltf.nodes[i].name in [x.name for x in ani_gltf.nodes]:
@@ -53,6 +53,8 @@ def apply_animations_to_model_gltf (model_gltf, ani_gltf):
     model_gltf.convert_buffers(BufferFormat.BINARYBLOB)
     binary_blob = model_gltf.binary_blob()
     blob_len = len(model_gltf.binary_blob())
+    if remove_model_ani == True:
+        model_gltf.animations = [] # Remove any prior animations (binary data will be orphaned)
     for i in range(len(ani_gltf.animations)):
         animation = Animation()
         for j in range(len(ani_gltf.animations[i].channels)):
@@ -117,38 +119,38 @@ def apply_animations_to_model_gltf (model_gltf, ani_gltf):
     model_gltf.set_binary_blob(binary_blob)
     return(model_gltf)
 
-def process_animation (animation):
-    print("Processing {0}...".format(animation))
-    if os.path.exists(animation+'.gltf'):
-        ani_filename = animation+'.gltf'
+def process_animation (animation_filename, model_filename = '', remove_model_ani = True):
+    print("Processing {0}...".format(animation_filename))
+    if os.path.exists(animation_filename+'.gltf'):
+        ani_filename = animation_filename+'.gltf'
         output = 'GLTF'
-    elif os.path.exists(animation+'.glb'):
-        ani_filename = animation+'.glb'
+    elif os.path.exists(animation_filename+'.glb'):
+        ani_filename = animation_filename+'.glb'
         output = 'GLB'
     else:
-        print("glTF file for {} not found, skipping...".format(animation))
+        print("glTF file for {} not found, skipping...".format(animation_filename))
         return False
     ani_gltf = GLTF2().load(ani_filename)
     if ani_gltf.animations is None or len(ani_gltf.animations) < 1:
-        print("Animation {} not found, skipping...".format(animation))
+        print("Animation {} not found, skipping...".format(animation_filename))
         return False
-    if len(ani_filename.split('_')) > 1:
+    if model_filename == '' and len(ani_filename.split('_')) > 1:
         model_filename = ani_filename.split('_')[0]
-        if os.path.exists(model_filename+'.glb'):
-            model_gltf = GLTF2.load(model_filename+'.glb')
-        elif os.path.exists(model_filename+'.gltf'):
-            model_gltf = GLTF2.load(model_filename+'.gltf')
-        else:
-            print("Model {0}.glb/.gltf not found, skipping animation {1}...".format(model_filename, animation))
-            return False
-        new_model = apply_animations_to_model_gltf (model_gltf, ani_gltf)
-        new_model.convert_buffers(BufferFormat.BINARYBLOB)
-        if output == 'GLB':
-            new_model.save_binary("{}.glb".format(animation))
-            return True
-        else:
-            new_model.save("{}.gltf".format(animation))
-            return True
+    if os.path.exists(model_filename+'.glb'):
+        model_gltf = GLTF2.load(model_filename+'.glb')
+    elif os.path.exists(model_filename+'.gltf'):
+        model_gltf = GLTF2.load(model_filename+'.gltf')
+    else:
+        print("Model {0}.glb/.gltf not found, skipping animation {1}...".format(model_filename, animation_filename))
+        return False
+    new_model = apply_animations_to_model_gltf (model_gltf, ani_gltf, remove_model_ani = remove_model_ani)
+    new_model.convert_buffers(BufferFormat.BINARYBLOB)
+    if output == 'GLB':
+        new_model.save_binary("{}.glb".format(animation_filename))
+        return True
+    else:
+        new_model.save("{}.gltf".format(animation_filename))
+        return True
 
 if __name__ == '__main__':
     # Set current directory
@@ -156,6 +158,18 @@ if __name__ == '__main__':
         os.chdir(os.path.dirname(sys.executable))
     else:
         os.chdir(os.path.abspath(os.path.dirname(__file__)))
-    animations = [x.split('.gl')[0] for x in glob.glob("*.gl*") if len(x.split('_')) > 1]
-    for animation in animations:
-        process_animation(animation)
+
+    # If argument given, attempt to import into file in argument
+    if len(sys.argv) > 1:
+        import argparse
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-k', '--keep_model_ani', help="Append animation onto model's animations if found", action="store_false")
+        parser.add_argument('model_filename', help="Name of glTF file obtain model from (required).")
+        parser.add_argument('animation_filename', help="Name of glTF file to import model into (required).")
+        args = parser.parse_args()
+        if os.path.exists(args.model_filename) and os.path.exists(args.animation_filename):
+            process_animation(args.animation_filename.split('.gl')[0], args.model_filename.split('.gl')[0], remove_model_ani = args.keep_model_ani)
+    else:
+        animations = [x.split('.gl')[0] for x in glob.glob("*.gl*") if len(x.split('_')) > 1]
+        for animation_filename in animations:
+            process_animation(animation_filename)
