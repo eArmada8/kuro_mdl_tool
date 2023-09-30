@@ -140,6 +140,8 @@ def process_animation (animation_filename, model_filename = '', remove_model_ani
         model_gltf = GLTF2.load(model_filename+'.glb')
     elif os.path.exists(model_filename+'.gltf'):
         model_gltf = GLTF2.load(model_filename+'.gltf')
+    elif len(models := glob.glob('*_c*.gl*')) > 0:
+        model_gltf = GLTF2.load(models[0])
     else:
         print("Model {0}.glb/.gltf not found, skipping animation {1}...".format(model_filename, animation_filename))
         return False
@@ -170,6 +172,6 @@ if __name__ == '__main__':
         if os.path.exists(args.model_filename) and os.path.exists(args.animation_filename):
             process_animation(args.animation_filename.split('.gl')[0], args.model_filename.split('.gl')[0], remove_model_ani = args.keep_model_ani)
     else:
-        animations = [x.split('.gl')[0] for x in glob.glob("*.gl*") if len(x.split('_')) > 1]
+        animations = [x.split('.gl')[0] for x in glob.glob("*_m*.gl*") if len(x.split('_')) > 1]
         for animation_filename in animations:
             process_animation(animation_filename)
