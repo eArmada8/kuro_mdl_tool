@@ -1,4 +1,4 @@
-# Tool to push a gltf model into animations.  A companion to kuro_mdl_to_basic_gltf.py.
+# Tool to push bones / keyframes from one gltf animation into another.  A companion to kuro_mdl_to_basic_gltf.py.
 #
 # GitHub eArmada8/kuro_mdl_tool
 
