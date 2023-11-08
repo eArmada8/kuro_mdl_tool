@@ -122,7 +122,7 @@ Overwrite existing files without prompting.
 Output .gltf/.bin format instead of .glb format.
 
 `-d, --dumpanidata`
-Dump all animation data (including unused channels and unknown floats) in a .json file.
+Dump all animation data (including unused channels and unknown floats) and the skeleton into .json files.  (Can be used with kuro_mdl_import_animation.py to allow manual changes to animation data.  This is mainly intended for use in modifying UV scrolling and shader parameter varying keyframes.)
 
 `-p, --preserve_bind_matrices`
 Use the bind matrices already in the mdl file, instead of calculating inverse bind matrices for each skinned mesh which is the default behavior.  This can do strange things to the models / animations, but may be necessary in some situations.
@@ -158,6 +158,9 @@ Shows help message.
 
 `-c, --change_compression`
 By default, the import script will detect if the current (pre-import) mdl file has CLE zstandard compression applied, and will compress the new file only if the current file is compressed.  Using this option will force the script to change the compression (*e.g.* it will change the output from compressed to non-compressed, or from non-compressed to compressed).
+
+`-j, --use_json_data`
+This option will direct the script to read the skeleton and all animation data from JSON files instead of a glTF container.  The script expects output from kuro_mdl_to_basic_gltf.py invoked with the -d option.
 
 ### kuro_gltf_to_meshes.py
 Double click the python script to run, and it will attempt to pull the meshes, skeleton and bone palettes out of each glTF file it finds (.glb or .gltf).  It will write to the same folder that kuro_mdl_export_meshes.py writes to.  This is very experimental, and it can only output in MDL v1 format (i.e. for Kuro 1, although CLE Kuro 2 accepts MDL v1 files).  It does not output materials, so use the material_info.json from kuro_mdl_export_meshes.py.

@@ -137,7 +137,7 @@ def get_gltf_name (animation):
         return False
     return(filename)
 
-def process_mdl (mdl_file, change_compression = False):
+def process_mdl (mdl_file, change_compression = False, use_json_data = False):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
@@ -146,27 +146,35 @@ def process_mdl (mdl_file, change_compression = False):
         mdl_data = decryptCLE(mdl_data)
     else:
         compressed = False
-    gltf_name = get_gltf_name(mdl_file[:-4])
     if 3 not in mdl_contents(mdl_data):
         print("Skipping {0} as it does not contain an animation.".format(mdl_file))
         return False
-    elif gltf_name == False:
-        print("Skipping {0} as there is no animation gltf file.".format(mdl_file))
-        return False
-    gltf = GLTF2().load(gltf_name)
-    try:
-        animation_metadata = read_struct_from_json(mdl_file[:-4]+'.metadata')
-    except:
-        print("{0} missing or unreadable, reading data from {0}.mdl instead...".format(mdl_file[:-4]+'.metadata', mdl_file))
-        with open(mdl_file, "rb") as f:
-            mdl_data = f.read()
-        mdl_data = decryptCLE(mdl_data)
-        skel_struct = obtain_skeleton_data(mdl_data)
-        animation_metadata = { 'locators': [x['name'] for x in skel_struct if x['type'] == 0],\
-            'non_skin_meshes': [x['name'] for x in skel_struct if x['skin_mesh'] == 0] }
-    skel_struct = build_skeleton_struct(gltf, animation_metadata)
+    if use_json_data == True:
+        try:
+            skel_struct = read_struct_from_json(mdl_file[:-4]+"_skeleton.json")
+            ani_struct = read_struct_from_json(mdl_file[:-4]+"_ani_struct.json")
+        except:
+            print("Skipping {0} as animation data missing or invalid.".format(mdl_file))
+            return False
+    else:
+        gltf_name = get_gltf_name(mdl_file[:-4])
+        if gltf_name == False:
+            print("Skipping {0} as there is no animation gltf file.".format(mdl_file))
+            return False
+        gltf = GLTF2().load(gltf_name)
+        try:
+            animation_metadata = read_struct_from_json(mdl_file[:-4]+'.metadata')
+        except:
+            print("{0} missing or unreadable, reading data from {0}.mdl instead...".format(mdl_file[:-4]+'.metadata', mdl_file))
+            with open(mdl_file, "rb") as f:
+                mdl_data = f.read()
+            mdl_data = decryptCLE(mdl_data)
+            skel_struct = obtain_skeleton_data(mdl_data)
+            animation_metadata = { 'locators': [x['name'] for x in skel_struct if x['type'] == 0],\
+                'non_skin_meshes': [x['name'] for x in skel_struct if x['skin_mesh'] == 0] }
+        skel_struct = build_skeleton_struct(gltf, animation_metadata)
+        ani_struct = extract_animation(gltf)
     skeleton_data = build_skeleton_section(skel_struct)
-    ani_struct = extract_animation(gltf)
     ani_data = build_animation_section(ani_struct)
     new_mdl_data = insert_animation_data(mdl_data, skeleton_data, ani_data)
     # Instead of overwriting backups, it will just tag a number onto the end
@@ -196,10 +204,11 @@ if __name__ == "__main__":
         import argparse
         parser = argparse.ArgumentParser()
         parser.add_argument('-c', '--change_compression', help="Change compression (compressed to uncompressed or vice versa)", action="store_true")
+        parser.add_argument('-j', '--use_json_data', help="Read data from JSON instead of glTF", action="store_true")
         parser.add_argument('mdl_filename', help="Name of mdl file to import into (required).")
         args = parser.parse_args()
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
-            process_mdl(args.mdl_filename, change_compression = args.change_compression)
+            process_mdl(args.mdl_filename, change_compression = args.change_compression, use_json_data = args.use_json_data)
     else:
         mdl_files = glob.glob('*.mdl')
         mdl_files = [x for x in mdl_files]
