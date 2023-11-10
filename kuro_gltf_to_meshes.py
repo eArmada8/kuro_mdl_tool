@@ -242,13 +242,13 @@ def build_skeleton_struct (model_gltf, metadata = {}):
         skel_node = { "id_referenceonly": i, "name": model_gltf.nodes[new_to_old_node_ids[i]].name }
         transform = {}
         if model_gltf.nodes[new_to_old_node_ids[i]].matrix is not None:
-                transform["pos_xyz"] = model_gltf.nodes[j].matrix[12:15]
-                transform["scale"] = [numpy.linalg.norm(model_gltf.nodes[j].matrix[0:3]),\
-                    numpy.linalg.norm(model_gltf.nodes[j].matrix[4:7]),\
-                    numpy.linalg.norm(model_gltf.nodes[j].matrix[8:11])]
-                r = numpy.array([(gltf.nodes[j].matrix[0:3]/transform["scale"][0]).tolist()+[0],\
-                    (gltf.nodes[j].matrix[4:7]/transform["scale"][1]).tolist()+[0],\
-                    (gltf.nodes[j].matrix[8:11]/transform["scale"][2]).tolist()+[0],[0,0,0,1]])
+                transform["pos_xyz"] = model_gltf.nodes[new_to_old_node_ids[i]].matrix[12:15]
+                transform["scale"] = [numpy.linalg.norm(model_gltf.nodes[new_to_old_node_ids[i]].matrix[0:3]),\
+                    numpy.linalg.norm(model_gltf.nodes[new_to_old_node_ids[i]].matrix[4:7]),\
+                    numpy.linalg.norm(model_gltf.nodes[new_to_old_node_ids[i]].matrix[8:11])]
+                r = numpy.array([(model_gltf.nodes[new_to_old_node_ids[i]].matrix[0:3]/transform["scale"][0]).tolist()+[0],\
+                    (model_gltf.nodes[new_to_old_node_ids[i]].matrix[4:7]/transform["scale"][1]).tolist()+[0],\
+                    (model_gltf.nodes[new_to_old_node_ids[i]].matrix[8:11]/transform["scale"][2]).tolist()+[0],[0,0,0,1]])
                 q = Quaternion(matrix=r)
                 transform["rotation_euler_rpy"] = calc_rpy_from_q(q)
         else:
