@@ -246,9 +246,16 @@ def build_skeleton_struct (model_gltf, metadata = {}):
                 transform["scale"] = [numpy.linalg.norm(model_gltf.nodes[new_to_old_node_ids[i]].matrix[0:3]),\
                     numpy.linalg.norm(model_gltf.nodes[new_to_old_node_ids[i]].matrix[4:7]),\
                     numpy.linalg.norm(model_gltf.nodes[new_to_old_node_ids[i]].matrix[8:11])]
-                r = numpy.array([(model_gltf.nodes[new_to_old_node_ids[i]].matrix[0:3]/transform["scale"][0]).tolist()+[0],\
-                    (model_gltf.nodes[new_to_old_node_ids[i]].matrix[4:7]/transform["scale"][1]).tolist()+[0],\
-                    (model_gltf.nodes[new_to_old_node_ids[i]].matrix[8:11]/transform["scale"][2]).tolist()+[0],[0,0,0,1]])
+                r = numpy.array([(model_gltf.nodes[new_to_old_node_ids[i]].matrix[0:3]/transform["scale"][0]).tolist(),\
+                    (model_gltf.nodes[new_to_old_node_ids[i]].matrix[4:7]/transform["scale"][1]).tolist(),\
+                    (model_gltf.nodes[new_to_old_node_ids[i]].matrix[8:11]/transform["scale"][2]).tolist()]) # Row-major
+                # Enforce orthogonality of rotation matrix, Premelani W and Bizard P "Direction Cosine Matrix IMU: Theory" Diy Drone: Usa 1 (2009).
+                if (error := numpy.dot(r[0],r[1])) != 0.0:
+                    vectors = [r[0]-(error/2)*r[1], r[1]-(error/2)*r[0]]
+                    vectors.append(numpy.cross(vectors[0], vectors[1]))
+                    r = numpy.array([x/numpy.linalg.norm(x) for x in vectors]).transpose() # Column-major
+                else:
+                    r = r.transpose() # Column-major
                 q = Quaternion(matrix=r)
                 transform["rotation_euler_rpy"] = calc_rpy_from_q(q)
         else:

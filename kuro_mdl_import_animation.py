@@ -62,10 +62,16 @@ def extract_animation (gltf, i = 0):
             if target_node.matrix is not None:
                 base_s = [numpy.linalg.norm(target_node.matrix[0:3]), numpy.linalg.norm(target_node.matrix[4:7]),\
                     numpy.linalg.norm(target_node.matrix[8:11])]
-                base_r_mtx = numpy.array([(target_node.matrix[0:3]/base_s[0]).tolist()+[0],\
-                    (target_node.matrix[4:7]/base_s[1]).tolist()+[0],\
-                    (target_node.matrix[8:11]/base_s[2]).tolist()+[0],[0,0,0,1]]).transpose()
-                # I need a more robust mechanism to calculate quaternions from matrices, but since Kuro does not use matrices, this will do for now
+                base_r_mtx = numpy.array([(target_node.matrix[0:3]/base_s[0]).tolist(),\
+                    (target_node.matrix[4:7]/base_s[1]).tolist(),\
+                    (target_node.matrix[8:11]/base_s[2]).tolist()]) # Row-major
+                # Enforce orthogonality of rotation matrix, Premelani W and Bizard P "Direction Cosine Matrix IMU: Theory" Diy Drone: Usa 1 (2009).
+                if (error := numpy.dot(base_r_mtx[0],base_r_mtx[1])) != 0.0:
+                    vectors = [base_r_mtx[0]-(error/2)*base_r_mtx[1], base_r_mtx[1]-(error/2)*base_r_mtx[0]]
+                    vectors.append(numpy.cross(vectors[0], vectors[1]))
+                    base_r_mtx = numpy.array([x/numpy.linalg.norm(x) for x in vectors]).transpose() # Column-major
+                else:
+                    base_r_mtx = base_r_mtx.transpose() # Column-major
                 base_r = Quaternion(matrix = base_r_mtx)
             else:
                 if target_node.rotation is not None:
