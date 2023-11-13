@@ -76,15 +76,7 @@ def dxgi_format (gltf, accessor_num):
 
 def calc_rpy_from_q (q):
     r = math.atan2(2.0*(q[2]*q[3] + q[0]*q[1]), q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3])
-    sin_p = -2.0*(q[1]*q[3] - q[0]*q[2])
-    try:
-        p = math.asin(sin_p)
-    except ValueError:
-        try:
-            p = math.asin(round(sin_p,5))
-        except ValueError as e:
-            print("Value Error on sin_p {0}: {1}".format(sin_p, e.msg))
-            raise
+    p = math.asin(max(min(-2.0*(q[1]*q[3] - q[0]*q[2]),1),-1))
     y = math.atan2(2.0*(q[1]*q[2] + q[0]*q[3]), q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3])
     return([r,p,y])
 
