@@ -217,7 +217,7 @@ def obtain_animation_data (animation_section_data):
             ani_block['id_referenceonly'] = i # Not used at all for repacking, purely for convenience
             ani_block['name'] = read_pascal_string(f).decode("ASCII")
             ani_block['bone'] = read_pascal_string(f).decode("ASCII")
-            ani_block['type'], unk0, unk1, ani_block['num_keyframes'] = struct.unpack("<4I",f.read(16))
+            ani_block['type'], ani_block['unk0'], ani_block['unk1'], ani_block['num_keyframes'] = struct.unpack("<4I",f.read(16))
             stride = key_stride[ani_block['type']] + 24
             buffer = f.read(ani_block['num_keyframes'] * stride)
             ani_block['inputs'] = [numpy.frombuffer(buffer[i*stride:i*stride+4],dtype='float32').tolist() for i in range(len(buffer)//stride)]

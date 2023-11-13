@@ -94,8 +94,8 @@ def build_animation_section (ani_struct):
     for i in range(len(ani_struct)):
         output_buffer += make_pascal_string(ani_struct[i]['name'])
         output_buffer += make_pascal_string(ani_struct[i]['bone'])
-        output_buffer += struct.pack("<4I", ani_struct[i]['type'], 0, 0, ani_struct[i]['num_keyframes'])
-        output_buffer += numpy.array([ani_struct[i]['inputs'][j]+ani_struct[i]['outputs'][j]+[0.0,0.0,0.0,0.0,0.0] for j \
+        output_buffer += struct.pack("<4I", ani_struct[i]['type'], ani_struct[i]['unk0'], ani_struct[i]['unk1'], ani_struct[i]['num_keyframes'])
+        output_buffer += numpy.array([ani_struct[i]['inputs'][j]+ani_struct[i]['outputs'][j]+ani_struct[i]['unknown'][j] for j \
             in range(ani_struct[i]['num_keyframes'])],dtype='float32').flatten().tobytes()
     timestamps = set([x for y in [x for y in ani_struct for x in y['inputs']] for x in y])
     output_buffer += struct.pack("<2f", min(timestamps), max(timestamps))
