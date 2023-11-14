@@ -83,6 +83,7 @@ def extract_animation (gltf, i = 0):
             outputs = [x[1:4]+[x[0]] for x in diff_outputs] #xyzw
         ani_block = {'name': target_node.name + '_' + \
             {'translation':'translate', 'rotation':'rotate', 'scale':'scale'}[gltf.animations[i].channels[j].target.path],\
+            'unk0': 0, 'unk1': 1, \
             'bone': target_node.name, 'type': {'translation':9, 'rotation':10, 'scale':11}[gltf.animations[i].channels[j].target.path],\
             'num_keyframes': len(inputs), 'inputs': inputs, 'outputs': outputs, 'unknown': [[0.0,0.0,0.0,0.0,0.0] for i in range(len(inputs))]}
         # The most recent sampler is used for interpolation.  We can only use one anyway, since all the transformations are combined.
