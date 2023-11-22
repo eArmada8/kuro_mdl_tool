@@ -176,7 +176,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
         with open(mdl_filename + '.mdl', "rb") as f:
             mdl_data = f.read()
         mdl_data = decryptCLE(mdl_data)
-        mesh_struct = obtain_mesh_data(mdl_data)
+        mesh_struct = obtain_mesh_data(mdl_data, obtain_material_data(mdl_data))
         has_parsed_original_file = True
         mesh_struct_metadata = mesh_struct["mesh_blocks"]
     output_buffer = struct.pack("<I", len(mesh_struct_metadata))
@@ -203,7 +203,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                         with open(mdl_filename + '.mdl', "rb") as f:
                             mdl_data = f.read()
                         mdl_data = decryptCLE(mdl_data)
-                        mesh_struct = obtain_mesh_data(mdl_data)
+                        mesh_struct = obtain_mesh_data(mdl_data, obtain_material_data(mdl_data))
                         has_parsed_original_file = True
                     # Generate an empty submesh
                     fmt = make_fmt_struct(mesh_struct["mesh_buffers"][i][j])
