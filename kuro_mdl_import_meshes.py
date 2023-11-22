@@ -223,8 +223,11 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                     input("Press Enter to continue.")
             except FileNotFoundError:
                 print("{}.vgmap not found, vertex group sanity check skipped.".format(mesh_filename))
-            primitive_buffer = struct.pack("<I", len(material_list))
-            material_list.append(mesh_struct_metadata[i]["primitives"][j]["material"])
+            if mesh_struct_metadata[i]["primitives"][j]["material"] in material_list:
+                primitive_buffer = struct.pack("<I", material_list.index(mesh_struct_metadata[i]["primitives"][j]["material"]))
+            else:
+                primitive_buffer = struct.pack("<I", len(material_list))
+                material_list.append(mesh_struct_metadata[i]["primitives"][j]["material"])
             if kuro_ver == 1:
                 primitive_buffer += struct.pack("<I", len(vb)+1)
             elif kuro_ver > 1:
