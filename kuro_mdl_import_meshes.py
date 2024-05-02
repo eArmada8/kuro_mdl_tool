@@ -189,7 +189,10 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
         mesh_block = bytes()
         meshes = 0 # Keep count of actual meshes imported, in case some have been deleted
         safe_filename = "".join([x if x not in "\/:*?<>|" else "_" for x in mesh_struct_metadata[i]["name"]])
-        expected_vgmap = {mesh_struct_metadata[i]['nodes'][j]['name']:j for j in range(len(mesh_struct_metadata[i]['nodes']))}
+        if "nodes" in mesh_struct_metadata[i].keys():
+            expected_vgmap = {mesh_struct_metadata[i]['nodes'][j]['name']:j for j in range(len(mesh_struct_metadata[i]['nodes']))}
+        else:
+            expected_vgmap = {}
         for j in range(len(mesh_struct_metadata[i]["primitives"])):
             try:
                 mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, safe_filename, j)
@@ -222,7 +225,8 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                     print("This model will likely have major animation distortions and may crash the game.")
                     input("Press Enter to continue.")
             except FileNotFoundError:
-                print("{}.vgmap not found, vertex group sanity check skipped.".format(mesh_filename))
+                if len(expected_vgmap) > 1:
+                    print("{}.vgmap not found, vertex group sanity check skipped.".format(mesh_filename))
             if mesh_struct_metadata[i]["primitives"][j]["material"] in material_list:
                 primitive_buffer = struct.pack("<I", material_list.index(mesh_struct_metadata[i]["primitives"][j]["material"]))
             else:
