@@ -13,7 +13,7 @@
 # GitHub eArmada8/kuro_mdl_tool
 
 try:
-    import io, struct, sys, os, glob, base64, json, blowfish, operator, zstandard
+    import io, struct, sys, os, glob, base64, json, blowfish, operator, zstandard, xxhash
     from itertools import chain
     from lib_fmtibvb import *
 except ModuleNotFoundError as e:
@@ -21,8 +21,8 @@ except ModuleNotFoundError as e:
     input("Press Enter to abort.")
     raise   
 
-# This script outputs non-empty vgmaps by default, change the following line to True to change
-complete_vgmaps_default = False
+# This script outputs complete vgmaps by default, change the following line to False to change
+complete_vgmaps_default = True
 
 # Thank you to authors of Kuro Tools for this decrypt function
 # https://github.com/nnguyen259/KuroTools
@@ -425,6 +425,7 @@ def obtain_material_data (mdl_data):
             material_block['material_name'] = read_pascal_string(f).decode("ASCII")
             material_block['shader_name'] = read_pascal_string(f).decode("ASCII")
             material_block['str3'] = read_pascal_string(f).decode("ASCII")
+            material_block['shader_switches_hash_referenceonly'] = ''
             texture_element_count, = struct.unpack("<I",f.read(4))
             material_block['textures'] = []
             for j in range(texture_element_count):
@@ -465,11 +466,15 @@ def obtain_material_data (mdl_data):
                 material_block['shaders'].append(shader_block)
             material_switch_count, = struct.unpack("<I",f.read(4))
             material_block['material_switches'] = []
+            switch_start = f.tell()
             for j in range(material_switch_count):
                 material_switch_block = {}
                 material_switch_block['material_switch_name'] = read_pascal_string(f).decode("ASCII")
                 material_switch_block['int2'], = struct.unpack("<i",f.read(4))
                 material_block['material_switches'].append(material_switch_block)
+            switch_end = f.tell()
+            f.seek(switch_start,0)
+            material_block['shader_switches_hash_referenceonly'] = xxhash.xxh64_hexdigest(f.read(switch_end - switch_start))
             uv_map_index_count, = struct.unpack("<I",f.read(4))
             material_block['uv_map_indices'] = list(struct.unpack("{0}B".format(uv_map_index_count),f.read(uv_map_index_count)))
             unknown1_count, = struct.unpack("<I",f.read(4))

@@ -16,14 +16,14 @@ I am very thankful for uyjulian, TwnKey, DarkStarSword, the KuroTools team and t
 
 ## Requirements:
 1. Python 3.10 and newer is required for use of these scripts.  It is free from the Microsoft Store, for Windows users.  For Linux users, please consult your distro.
-2. The blowfish, zstandard, numpy and pyquaternion modules for python are needed.  Install by typing "python3 -m pip install blowfish zstandard numpy pyquaternion" in the command line / shell.  (The io, re, struct, sys, os, shutil, glob, base64, json, operator, argparse and itertools modules are also required, but these are all already included in most basic python installations.)
+2. The blowfish, zstandard, numpy, pyquaternion and xxhash modules for python are needed.  Install by typing "python3 -m pip install blowfish zstandard numpy pyquaternion xxhash" in the command line / shell.  (The io, re, struct, sys, os, shutil, glob, base64, json, operator, argparse and itertools modules are also required, but these are all already included in most basic python installations.)
 3. The output can be imported into Blender using DarkStarSword's amazing plugin: https://github.com/DarkStarSword/3d-fixes/blob/master/blender_3dmigoto.py (tested on commit [5fd206c](https://raw.githubusercontent.com/DarkStarSword/3d-fixes/5fd206c52fb8c510727d1d3e4caeb95dac807fb2/blender_3dmigoto.py))
 4. kuro_mdl_export_meshes.py is dependent on lib_fmtibvb.py, which must be in the same folder.  
 kuro_mdl_import_meshes.py is dependent on both kuro_mdl_export_meshes.py and lib_fmtibvb.py.
 
 ## Usage:
 ### kuro_mdl_export_meshes.py
-Double click the python script and it will search the current folder for all .mdl files and export the meshes into a folder with the same name as the mdl file.  Additionally, it will output 5 JSON files, one with metadata from the mesh section, another with the data from the materials section, another with the skeleton, and fourth with the MDL version, and (for convenience) a list of textures used by the MDL.
+Double click the python script and it will search the current folder for all .mdl files and export the meshes into a folder with the same name as the mdl file.  Additionally, it will output 5 JSON files, one with metadata from the mesh section, another with the data from the materials section, another with the skeleton, and fourth with the MDL version, and (for convenience) a list of textures used by the MDL.  The materials output will contain a 64-bit hash, which is not used by the game; this is only for kuro_find_similar_shaders.py.
 
 **Command line arguments:**
 `kuro_mdl_export_meshes.py [-h] [-c] [-t] [-o] mdl_filename`
@@ -200,3 +200,8 @@ This script will decrypt and/or decompress files using the Blowfish key that is 
 `cle_decrypt_decompress.py [-h] cle_asset_filename`
 
 No command line options, but you can decrypt / decompress single files using the command line.
+
+### kuro_find_similar_shaders.py
+This script will take the hash output from kuro_mdl_export_meshes.py and attempt to find different available shaders.  It will list shaders in order of increasing differences in the switches.  The script will write a text file in the same directory.  kuro_shaders.csv is required for the search.
+
+The script will ask if you want to restrict output to shaders available in a specific game (e.g. Kuro 1, Kuro 2) - if a restriction is set then each shader listed will have a model file in which you can find the shader utilized.
