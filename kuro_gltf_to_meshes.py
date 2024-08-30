@@ -22,7 +22,7 @@ except ModuleNotFoundError as e:
     raise   
 
 # This script outputs non-empty vgmaps by default, change the following line to True to change
-complete_vgmaps_default = False
+complete_vgmaps_default = True
 
 def accessor_stride(gltf, accessor_num):
     accessor = gltf.accessors[accessor_num]
