@@ -222,8 +222,23 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                 if not (all([True if x in expected_vgmap else False for x in vgmap])\
                     and all([expected_vgmap[x] == vgmap[x] for x in vgmap])):
                     print("Warning! {}.vgmap does not match the internal skin node tree!".format(mesh_filename))
-                    print("This model will likely have major animation distortions and may crash the game.")
-                    input("Press Enter to continue.")
+                    rev_vgmap = {vgmap[k]:k for k in vgmap}
+                    semantics = [x['SemanticName'] for x in vb]
+                    if 'BLENDINDICES' in semantics:
+                        vg_index = semantics.index('BLENDINDICES')
+                        used_vg = [rev_vgmap[z] for z in sorted(list(set([x for y in vb[vg_index]['Buffer'] for x in y])))]
+                        if all([x in expected_vgmap.keys() for x in used_vg]):
+                            print("VGMap appears compatible, attempting automatic remap...")
+                            new_buffer = []
+                            for k in range(len(vb[vg_index]['Buffer'])):
+                                new_buffer.append([expected_vgmap[y] for y in [rev_vgmap[z] for z in vb[vg_index]['Buffer'][k]]])
+                            vb[vg_index]['Buffer'] = new_buffer
+                        else:
+                            print("VGMap incompatible with this mesh, automatic remap not possible.")
+                            print("This model will likely have major animation distortions and may crash the game.")
+                            input("Press Enter to continue.")
+                    else:
+                        pass # No weights, sanity check unnecessary
             except FileNotFoundError:
                 if len(expected_vgmap) > 1:
                     print("{}.vgmap not found, vertex group sanity check skipped.".format(mesh_filename))
