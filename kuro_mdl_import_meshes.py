@@ -224,14 +224,19 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                     print("Warning! {}.vgmap does not match the internal skin node tree!".format(mesh_filename))
                     rev_vgmap = {vgmap[k]:k for k in vgmap}
                     semantics = [x['SemanticName'] for x in vb]
-                    if 'BLENDINDICES' in semantics:
+                    if 'BLENDINDICES' in semantics and 'BLENDWEIGHTS' in semantics:
                         vg_index = semantics.index('BLENDINDICES')
-                        used_vg = [rev_vgmap[z] for z in sorted(list(set([x for y in vb[vg_index]['Buffer'] for x in y])))]
+                        wt_index = semantics.index('BLENDWEIGHTS')
+                        indices = [x for y in vb[vg_index]['Buffer'] for x in y]
+                        weights = [x for y in vb[wt_index]['Buffer'] for x in y]
+                        true_indices = sorted(list(set([indices[k] for k in range(len(indices)) if weights[k] > 0.0])))
+                        used_vg = [rev_vgmap[z] for z in true_indices]
                         if all([x in expected_vgmap.keys() for x in used_vg]):
                             print("VGMap appears compatible, attempting automatic remap...")
                             new_buffer = []
                             for k in range(len(vb[vg_index]['Buffer'])):
-                                new_buffer.append([expected_vgmap[y] for y in [rev_vgmap[z] for z in vb[vg_index]['Buffer'][k]]])
+                                new_buffer.append([expected_vgmap[y] if y in expected_vgmap else 0 for y \
+                                    in [rev_vgmap[z] for z in vb[vg_index]['Buffer'][k]]])
                             vb[vg_index]['Buffer'] = new_buffer
                         else:
                             print("VGMap incompatible with this mesh, automatic remap not possible.")
