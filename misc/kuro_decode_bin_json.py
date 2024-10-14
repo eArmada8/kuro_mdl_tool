@@ -22,23 +22,16 @@ def read_string_from_dict (f):
 
 def read_value (f):
     dat_type, = struct.unpack("<B", f.read(1))
+    name = ''
+    if dat_type < 0x10:
+        name = read_string_from_dict(f)
+    else:
+        name = ''
     if dat_type in [0x02, 0x12]:
-        if dat_type == 0x02:
-            name = read_string_from_dict(f)
-        elif dat_type == 0x12:
-            name = ''
         data = read_null_terminated_string(f)
     elif dat_type in [0x03, 0x13]:
-        if dat_type == 0x03:
-            name = read_string_from_dict(f)
-        elif dat_type == 0x13:
-            name = ''
         data, = struct.unpack("<d", f.read(8))
     elif dat_type in [0x04, 0x14]:
-        if dat_type == 0x04:
-            name = read_string_from_dict(f)
-        elif dat_type == 0x14:
-            name = ''
         data = {}
         num_entries, = struct.unpack("<I", f.read(4))
         f.seek(4 * num_entries, 1) # These are the byte locations of the entries, unneeded (and out of order)
@@ -46,11 +39,6 @@ def read_value (f):
             datum = read_value(f)
             data[datum[0]] = datum[1]
     elif dat_type in [0x05, 0x15]:
-        if dat_type == 0x05:
-            name = read_string_from_dict(f)
-        elif dat_type == 0x15:
-            print("15 found! location: {}".format (hex(f.tell())))
-            name = ''
         data = []
         num_entries, = struct.unpack("<I", f.read(4))
         f.seek(4 * num_entries, 1) # These are the byte locations of the entries, unneeded (and out of order)
@@ -58,10 +46,6 @@ def read_value (f):
             datum = read_value(f)
             data.append(datum[1])
     elif dat_type in [0x06, 0x16]:
-        if dat_type == 0x06:
-            name = read_string_from_dict(f)
-        elif dat_type == 0x16:
-            name = ''
         data = {0:False, 1:True}[struct.unpack("<B", f.read(1))[0]]
     else:
         print("Unknown OP code!! code {0}, location: {1}.".format(hex(dat_type), hex(f.tell()-1)))
