@@ -305,6 +305,10 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                         element_type = 'B'
                         float_max = ((2**8)-1)
                         data_list = [int(round(min(max(x,0), 1) * float_max)) for x in list(chain.from_iterable(current_buffer))]
+                    case "SNORM":
+                        element_type = 'b'
+                        float_max = ((2**(8-1))-1)
+                        data_list = [int(round(min(max(x,-1), 1) * float_max)) for x in list(chain.from_iterable(current_buffer))]
                 raw_buffer = struct.pack("<{0}{1}".format(len(data_list), element_type), *data_list)
                 if kuro_ver == 1:
                     primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
