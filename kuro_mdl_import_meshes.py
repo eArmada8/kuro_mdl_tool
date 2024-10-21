@@ -252,8 +252,12 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
             else:
                 primitive_buffer = struct.pack("<I", len(material_list))
                 material_list.append(mesh_struct_metadata[i]["primitives"][j]["material"])
+            num_texcoord = len([x for x in fmt["elements"] if x["SemanticName"] == "TEXCOORD"])
+            primitive_buffer_elements = len(vb)+1 # vb+ib
+            if kuro_ver <= 2 and num_texcoord < 2: # Add a second texcoord, required by Kuro 1 (&2?)
+                primitive_buffer_elements += 1
             if kuro_ver == 1:
-                primitive_buffer += struct.pack("<I", len(vb)+1)
+                primitive_buffer += struct.pack("<I", primitive_buffer_elements)
             elif kuro_ver > 1:
                 primitive_buffer += struct.pack("<2I", len(ib), mesh_struct_metadata[i]["primitives"][j]["unk"])
             for k in range(len(vb)):
@@ -265,13 +269,16 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                 vec_elements = len(vec_format)
                 vec_stride = int(int(vec_format[0]) * vec_elements / 8)
                 reverse_colors = False # COLOR is BGR in Kuro 2
+                eval_buffer_len = False # Normal and Tangent may need buffer length change
                 match vb[k]["SemanticName"]:
                     case "POSITION":
                         type_int = 0
                     case "NORMAL":
                         type_int = 1
+                        eval_buffer_len = True
                     case "TANGENT":
                         type_int = 2
+                        eval_buffer_len = True
                     case "COLOR":
                         type_int = 3
                         if kuro_ver == 1: # Forcing 32-bit float since Kuro 1 uses float
@@ -279,7 +286,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                                 reverse_colors = True
                             vec_type = 'FLOAT'
                             vec_stride = 4 * vec_elements
-                        elif kuro_ver == 2: # Forcing 8-bit unorm since Kuro 2 models use 8-bit UNORM
+                        elif kuro_ver > 1: # Forcing 8-bit unorm since Kuro 2 models use 8-bit UNORM
                             if vec_first_color == 'R':
                                 reverse_colors = True
                             vec_type = 'UNORM'
@@ -294,6 +301,16 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                     current_buffer = [[x[2],x[1],x[0],x[3]] for x in vb[k]["Buffer"]]
                 else:
                     current_buffer = vb[k]["Buffer"]
+                if eval_buffer_len == True and type_int in [1,2]: # Only eval for Normal, Tangent
+                    if kuro_ver <= 2 : # Forcing 32-bit float since Kuro 1 uses float
+                        vec_type, vec_elements, vec_stride = 'FLOAT', 3, 12
+                        current_buffer = [x[0:3] for x in vb[k]["Buffer"]]
+                    elif kuro_ver > 2: # Forcing 8-bit VEC4
+                        vec_type, vec_elements, vec_stride = 'SNORM', 4, 4
+                        if len(vb[k]["Buffer"][0]) < 4:
+                            current_buffer = [x[0:3]+[0.0]*(4-len(vb[k]["Buffer"][0])) for x in vb[k]["Buffer"]]
+                        else:
+                            current_buffer = vb[k]["Buffer"]
                 match vec_type:
                     case "FLOAT":
                         element_type = 'f'
@@ -316,6 +333,13 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                     prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, j)
                     prim_output_data += raw_buffer
                     prim_buffer_count += 1
+                if kuro_ver <= 2 and type_int == 4 and num_texcoord < 2: # Add a second texcoord, required by Kuro 1 (&2?)
+                    if kuro_ver == 1:
+                        primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
+                    elif kuro_ver > 1:
+                        prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, j)
+                        prim_output_data += raw_buffer
+                        prim_buffer_count += 1
             # After VB, need to add IB
             # Making assumptions here that it will always be in Rxx_UINT format, saves a bunch of code
             vec_stride = int(int(re.findall("[0-9]+",fmt["format"].split('DXGI_FORMAT_')[-1].split('_')[0])[0]) / 8)
