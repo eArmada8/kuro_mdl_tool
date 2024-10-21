@@ -260,6 +260,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                 primitive_buffer += struct.pack("<I", primitive_buffer_elements)
             elif kuro_ver > 1:
                 primitive_buffer += struct.pack("<2I", len(ib), mesh_struct_metadata[i]["primitives"][j]["unk"])
+            texcoord_counter = 0
             for k in range(len(vb)):
                 dxgi_format = fmt["elements"][k]["Format"].split('DXGI_FORMAT_')[-1]
                 dxgi_format_split = dxgi_format.split('_')
@@ -293,6 +294,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                             vec_stride = vec_elements
                     case "TEXCOORD":
                         type_int = 4
+                        texcoord_counter += 1 # This will be 1 for TEXCOORD0, 2 for TEXCOORD1, etc
                     case "BLENDWEIGHTS":
                         type_int = 5
                     case "BLENDINDICES":
@@ -333,7 +335,8 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                     prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, j)
                     prim_output_data += raw_buffer
                     prim_buffer_count += 1
-                if kuro_ver <= 2 and type_int == 4 and num_texcoord in [1,2]: # Minimum 3 texcoord, required by Kuro 1 (&2?)
+                # Minimum 3 texcoord, required by Kuro 1 (&2?)
+                if kuro_ver <= 2 and type_int == 4 and num_texcoord in [1,2] and texcoord_counter == num_texcoord:
                     for l in range(3 - num_texcoord):
                         if kuro_ver == 1:
                             primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
