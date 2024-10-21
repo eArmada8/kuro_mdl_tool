@@ -201,6 +201,9 @@ This script will decrypt and/or decompress files using the Blowfish key that is 
 
 No command line options, but you can decrypt / decompress single files using the command line.
 
+### kuro_find_missing_shaders.py
+This script will first ask you for the game you are targeting, then it will take the hash output from kuro_mdl_export_meshes.py and report which shaders are not available in that game.  The script will write a report in JSON format in the same directory.  kuro_shaders.csv is required for the search.
+
 ### kuro_find_similar_shaders.py
 This script will take the hash output from kuro_mdl_export_meshes.py and attempt to find different available shaders.  It will list shaders in order of increasing differences in the switches.  The script will write a text file in the same directory.  kuro_shaders.csv is required for the search.
 
