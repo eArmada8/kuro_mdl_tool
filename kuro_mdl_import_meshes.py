@@ -254,8 +254,8 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                 material_list.append(mesh_struct_metadata[i]["primitives"][j]["material"])
             num_texcoord = len([x for x in fmt["elements"] if x["SemanticName"] == "TEXCOORD"])
             primitive_buffer_elements = len(vb)+1 # vb+ib
-            if kuro_ver <= 2 and num_texcoord < 2: # Add a second texcoord, required by Kuro 1 (&2?)
-                primitive_buffer_elements += 1
+            if kuro_ver <= 2 and num_texcoord in [1,2]: # Increase texcoord to 3, required by Kuro 1 (&2?)
+                primitive_buffer_elements += 3 - num_texcoord
             if kuro_ver == 1:
                 primitive_buffer += struct.pack("<I", primitive_buffer_elements)
             elif kuro_ver > 1:
@@ -333,13 +333,14 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                     prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, j)
                     prim_output_data += raw_buffer
                     prim_buffer_count += 1
-                if kuro_ver <= 2 and type_int == 4 and num_texcoord < 2: # Add a second texcoord, required by Kuro 1 (&2?)
-                    if kuro_ver == 1:
-                        primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
-                    elif kuro_ver > 1:
-                        prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, j)
-                        prim_output_data += raw_buffer
-                        prim_buffer_count += 1
+                if kuro_ver <= 2 and type_int == 4 and num_texcoord in [1,2]: # Minimum 3 texcoord, required by Kuro 1 (&2?)
+                    for l in range(3 - num_texcoord):
+                        if kuro_ver == 1:
+                            primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
+                        elif kuro_ver > 1:
+                            prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, j)
+                            prim_output_data += raw_buffer
+                            prim_buffer_count += 1
             # After VB, need to add IB
             # Making assumptions here that it will always be in Rxx_UINT format, saves a bunch of code
             vec_stride = int(int(re.findall("[0-9]+",fmt["format"].split('DXGI_FORMAT_')[-1].split('_')[0])[0]) / 8)
