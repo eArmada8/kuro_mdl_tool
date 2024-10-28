@@ -41,7 +41,7 @@ def read_value (f):
     elif dat_type in [0x05, 0x15]:
         data = []
         num_entries, = struct.unpack("<I", f.read(4))
-        f.seek(4 * num_entries, 1) # These are the byte locations of the entries, unneeded (and out of order)
+        f.seek(4 * num_entries, 1) # These are the byte locations of the entries, unneeded
         for _ in range(num_entries):
             datum = read_value(f)
             data.append(datum[1])
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         import argparse
         parser = argparse.ArgumentParser()
         parser.add_argument('-o', '--overwrite', help="Overwrite existing files", action="store_true")
-        parser.add_argument('bin_json_filename', help="Name of gltf file to export from (required).")
+        parser.add_argument('bin_json_filename', help="Name of .mi file to export from (required).")
         args = parser.parse_args()
         if os.path.exists(args.bin_json_filename):
             decode_falcom_bin_json(args.bin_json_filename, overwrite = args.overwrite)
