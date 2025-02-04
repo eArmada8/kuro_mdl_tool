@@ -15,7 +15,7 @@ def read_string_from_dict (f):
     addr, = struct.unpack("<I", f.read(4))
     return_address = f.tell()
     f.seek(addr)
-    f.seek(4,1) # unknown, maybe a hash?
+    f.seek(4,1) # 0xFFFFFFFF - CRC32 of string in binary format
     dict_string = read_null_terminated_string(f)
     f.seek(return_address)
     return(dict_string)
@@ -34,17 +34,25 @@ def read_value (f):
     elif dat_type in [0x04, 0x14]:
         data = {}
         num_entries, = struct.unpack("<I", f.read(4))
-        f.seek(4 * num_entries, 1) # These are the byte locations of the entries, unneeded (and out of order)
-        for _ in range(num_entries):
+        addresses = struct.unpack("<{}I".format(num_entries), f.read(4 * num_entries))
+        end_offset = f.tell() # This will be used to find the actual end_offset
+        for address in addresses:
+            f.seek(address)
             datum = read_value(f)
             data[datum[0]] = datum[1]
+            end_offset = max(f.tell(), end_offset)
+        f.seek(end_offset)
     elif dat_type in [0x05, 0x15]:
         data = []
         num_entries, = struct.unpack("<I", f.read(4))
-        f.seek(4 * num_entries, 1) # These are the byte locations of the entries, unneeded
-        for _ in range(num_entries):
+        addresses = struct.unpack("<{}I".format(num_entries), f.read(4 * num_entries))
+        end_offset = f.tell() # This will be used to find the actual end_offset
+        for address in addresses:
+            f.seek(address)
             datum = read_value(f)
             data.append(datum[1])
+            end_offset = max(f.tell(), end_offset)
+        f.seek(end_offset)
     elif dat_type in [0x06, 0x16]:
         data = {0:False, 1:True}[struct.unpack("<B", f.read(1))[0]]
     else:
