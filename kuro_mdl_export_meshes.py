@@ -304,7 +304,10 @@ def obtain_mesh_data (mdl_data, material_struct, trim_for_gpu = False):
                                     buffer_data.append(struct.unpack("<{0}H".format(int(element["stride"]/2)), prim.read(element["stride"])))
                                 format_string = "".join(format_colors[0:int(element["stride"]/2)]) + "_UINT"
                         case 'U': #8-bit UNORM
-                            format_colors = ['B8','G8','R8','A8'] # Dunno why Kuro 2 has this reversed...  This isn't used in Kuro 1, so will not test version for now
+                            if kuro_ver == 2:
+                                format_colors = ['B8','G8','R8','A8'] # Dunno why Kuro 2 has this reversed
+                            else:
+                                format_colors = ['R8','G8','B8','A8']
                             float_max = ((2**8)-1) #Assuming all UNORM is 8-bit
                             for l in range(element["count"]):
                                 if kuro_ver == 1:

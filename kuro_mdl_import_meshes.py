@@ -287,8 +287,10 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                                 reverse_colors = True
                             vec_type = 'FLOAT'
                             vec_stride = 4 * vec_elements
-                        elif kuro_ver > 1: # Forcing 8-bit unorm since Kuro 2 models use 8-bit UNORM
-                            if vec_first_color == 'R':
+                        elif kuro_ver > 1: # Forcing 8-bit unorm since MDL v2 and up use 8-bit UNORM
+                            if vec_first_color == 'R' and kuro_ver == 2: # Kuro 2 uses BGRA instead of RGBA
+                                reverse_colors = True
+                            elif vec_first_color == 'B' and not kuro_ver == 2:
                                 reverse_colors = True
                             vec_type = 'UNORM'
                             vec_stride = vec_elements
