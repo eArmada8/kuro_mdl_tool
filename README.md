@@ -186,7 +186,7 @@ which you can change to
 This will also change the command line argument `-c, --completemaps` into `-p, --partialmaps` which you would call to enable non-empty group vgmaps instead.
 
 ### cle_compress.py
-This script will compress files with zstandard so they can be used in Kuro no Kiseki 2 (CLE release).  If double-clicked, it will compress all files it finds in the current directory, assuming they are not .py, .bak, or already compressed.  This is not necessary with output from the importer since the files are already compressed, but would be needed for textures, etc.
+This script will compress and encrypt files with zstandard so they can be used in Kuro no Kiseki 2 (CLE release).  If double-clicked, it will compress and encrypt all files it finds in the current directory, assuming they are not .py, .bak, or already compressed.  This is not necessary with output from the importer since the files are already compressed, but would be needed for textures, etc.  MDL and DDS files will be compressed only, as the game does not expect them to be not encrypted.
 
 **Command line arguments:**
 `cle_compress.py [-h] filename`
