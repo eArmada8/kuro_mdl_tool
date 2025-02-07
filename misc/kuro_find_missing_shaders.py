@@ -37,9 +37,9 @@ if __name__ == "__main__":
         os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
     shader_db = Shader_db(csv_file)
-    game_type = input("Please enter game [{}]: ".format(', '.join(shader_db.shader_array[0][1:3])))
-    while not game_type in shader_db.shader_array[0][1:3]:
-        game_type = input("Invalid entry. Please enter game [{}]: ".format(', '.join(shader_db.shader_array[0][1:3])))
+    game_type = input("Please enter game [{}]: ".format(', '.join(shader_db.shader_array[0][1:4])))
+    while not game_type in shader_db.shader_array[0][1:4]:
+        game_type = input("Invalid entry. Please enter game [{}]: ".format(', '.join(shader_db.shader_array[0][1:4])))
     shader_db.set_restricted_list(game_type)
     missing_shader_report = {}
     mat_files = glob.glob('**/material_info.json')
