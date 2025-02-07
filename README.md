@@ -8,11 +8,11 @@ Please see the [wiki](https://github.com/eArmada8/kuro_mdl_tool/wiki), and the d
 ## Credits:
 99.9% of my understanding of the MDL format comes from the reverse engineering work of Julian Uy (github.com/uyjulian), and specifically his MDL to GLTF convertor: https://gist.github.com/uyjulian/9a9d6395682dac55d113b503b1172009
 
-The code to decrypt and decompress CLE assets comes from KuroTools (https://github.com/nnguyen259/KuroTools), and I also looked through MDL convertor in KuroTools by TwnKey (github.com/TwnKey) to understand the MDL format.
+The code to decrypt and decompress CLE assets comes from KuroTools (https://github.com/nnguyen259/KuroTools), and I also looked through MDL convertor in KuroTools by TwnKey (github.com/TwnKey) to understand the MDL format.  weskeryiu also provided many insights into the MDL format via in-game experimentation, and helped find numerous bugs in these scripts.
 
 None of this would be possible without the work of DarkStarSword and his amazing 3DMigoto-Blender plugin, of course.
 
-I am very thankful for uyjulian, TwnKey, DarkStarSword, the KuroTools team and the Kiseki modding discord for their brilliant work and for sharing that work so freely.
+I am very thankful for uyjulian, TwnKey, weskeryiu, DarkStarSword, the KuroTools team and the Kiseki modding discord for their brilliant work and for sharing that work so freely.
 
 ## Requirements:
 1. Python 3.10 and newer is required for use of these scripts.  It is free from the Microsoft Store, for Windows users.  For Linux users, please consult your distro.
