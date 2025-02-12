@@ -151,7 +151,7 @@ def dump_meshes (mesh_node, gltf, complete_maps = False):
         AlignedByteOffset = 0
         Semantics = {'POSITION': ['POSITION','0'], 'NORMAL': ['NORMAL','0'], 'TANGENT': ['TANGENT','0'],\
             'TEXCOORD_0': ['TEXCOORD','0'], 'TEXCOORD_1': ['TEXCOORD','1'], 'TEXCOORD_2': ['TEXCOORD','2'],\
-            'COLOR_0': ['COLOR','0'], 'COLOR_1': ['COLOR','1'], 'WEIGHTS_0': ['BLENDWEIGHTS','0'],\
+            'COLOR_0': ['COLOR','0'], 'COLOR_1': ['COLOR','1'], 'WEIGHTS_0': ['BLENDWEIGHT','0'],\
             'JOINTS_0': ['BLENDINDICES','0']}
         for semantic in Semantics:
             if hasattr(mesh.primitives[i].attributes, semantic):

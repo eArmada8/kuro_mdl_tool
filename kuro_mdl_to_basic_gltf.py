@@ -96,7 +96,7 @@ def convert_format_for_gltf(dxgi_format):
 def convert_fmt_for_gltf(fmt):
     new_fmt = copy.deepcopy(fmt)
     stride = 0
-    new_semantics = {'BLENDWEIGHTS': 'WEIGHTS', 'BLENDINDICES': 'JOINTS'}
+    new_semantics = {'BLENDWEIGHT': 'WEIGHTS', 'BLENDWEIGHTS': 'WEIGHTS', 'BLENDINDICES': 'JOINTS'}
     need_index = ['WEIGHTS', 'JOINTS', 'COLOR', 'TEXCOORD']
     for i in range(len(fmt['elements'])):
         if new_fmt['elements'][i]['SemanticName'] in new_semantics.keys():
@@ -146,7 +146,8 @@ def fix_weight_groups(submesh, global_node_dict):
     # Avoid some strange behavior from variable assignment, will copy instead
     new_submesh = copy.deepcopy(submesh)
     bone_element_index = int([x['fmt'] for x in new_submesh['vb'] if x['fmt']['SemanticName'] == 'BLENDINDICES'][0]['id'])
-    weight_element_index = int([x['fmt'] for x in new_submesh['vb'] if x['fmt']['SemanticName'] == 'BLENDWEIGHTS'][0]['id'])
+    weight_element_index = int([x['fmt'] for x in new_submesh['vb']\
+        if x['fmt']['SemanticName'] in ['BLENDWEIGHT', 'BLENDWEIGHTS']][0]['id'])
     #glTF does not support 32-bit bone indices for some reason, hopefully skeletons will fit into 16-bit
     new_submesh['vb'][bone_element_index]['fmt']['Format'] = re.sub("32","16", new_submesh['vb'][bone_element_index]['fmt']['Format'])
     new_submesh = fix_strides(new_submesh)

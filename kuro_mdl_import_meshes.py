@@ -224,9 +224,12 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                     print("Warning! {}.vgmap does not match the internal skin node tree!".format(mesh_filename))
                     rev_vgmap = {vgmap[k]:k for k in vgmap}
                     semantics = [x['SemanticName'] for x in vb]
-                    if 'BLENDINDICES' in semantics and 'BLENDWEIGHTS' in semantics:
+                    if 'BLENDINDICES' in semantics and ('BLENDWEIGHT' in semantics or 'BLENDWEIGHTS' in semantics):
                         vg_index = semantics.index('BLENDINDICES')
-                        wt_index = semantics.index('BLENDWEIGHTS')
+                        if 'BLENDWEIGHT' in semantics:
+                            wt_index = semantics.index('BLENDWEIGHT')
+                        else:
+                            wt_index = semantics.index('BLENDWEIGHTS')
                         indices = [x for y in vb[vg_index]['Buffer'] for x in y]
                         weights = [x for y in vb[wt_index]['Buffer'] for x in y]
                         true_indices = sorted(list(set([indices[k] for k in range(len(indices)) if weights[k] > 0.0])))
@@ -297,7 +300,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                     case "TEXCOORD":
                         type_int = 4
                         texcoord_counter += 1 # This will be 1 for TEXCOORD0, 2 for TEXCOORD1, etc
-                    case "BLENDWEIGHTS":
+                    case "BLENDWEIGHT" | "BLENDWEIGHTS":
                         type_int = 5
                     case "BLENDINDICES":
                         type_int = 6

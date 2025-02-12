@@ -265,7 +265,7 @@ def obtain_mesh_data (mdl_data, material_struct, trim_for_gpu = False):
                             element["Semantic"] = "TEXCOORD"
                             element_type = 'f'
                         case 5:
-                            element["Semantic"] = "BLENDWEIGHTS"
+                            element["Semantic"] = "BLENDWEIGHT"
                             element_type = 'f'
                         case 6:
                             element["Semantic"] = "BLENDINDICES"
