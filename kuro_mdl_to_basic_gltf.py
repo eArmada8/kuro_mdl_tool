@@ -446,8 +446,16 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                     primitive["material"] = material_dict[mesh_struct['mesh_blocks'][i]['primitives'][j]['material']]
                 primitives.append(primitive)
                 del(submesh)
-            mesh_node = [j for j in range(len(gltf_data['nodes']))\
-                if gltf_data['nodes'][j]['name'] == mesh_struct["mesh_blocks"][i]["name"]][0]
+            if mesh_struct["mesh_blocks"][i]["name"] in [x['name'] for x in gltf_data['nodes']]:
+                mesh_node = [j for j in range(len(gltf_data['nodes']))\
+                    if gltf_data['nodes'][j]['name'] == mesh_struct["mesh_blocks"][i]["name"]][0]
+            elif mesh_struct["mesh_blocks"][i]["name"].split(':')[-1] in [x['name'] for x in gltf_data['nodes']]:
+                mesh_node = [j for j in range(len(gltf_data['nodes']))\
+                    if gltf_data['nodes'][j]['name'] == mesh_struct["mesh_blocks"][i]["name"].split(':')[-1]][0]
+            else:
+                gltf_data['nodes'][0]['children'].append(len(gltf_data['nodes']))
+                mesh_node = len(gltf_data['nodes'])
+                gltf_data['nodes'].append({'name': mesh_struct["mesh_blocks"][i]["name"], 'mesh': len(gltf_data['meshes'])})
             gltf_data['nodes'][mesh_node]['mesh'] = len(gltf_data['meshes'])
             gltf_data['meshes'].append({"primitives": primitives, "name": mesh_struct["mesh_blocks"][i]["name"]})
             if has_skeleton:
