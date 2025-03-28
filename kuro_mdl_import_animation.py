@@ -106,12 +106,12 @@ def insert_animation_data (mdl_data, skeleton_section_data, animation_section_da
     with io.BytesIO(mdl_data) as f:
         new_mdl_data = f.read(4) #Header
         orig_kuro_ver, = struct.unpack("<I", f.read(4))
-        if orig_kuro_ver == 2:
+        if orig_kuro_ver > 1:
             if sorted(mdl_contents(mdl_data)) == [2,3]:
-                orig_kuro_ver = 1 #Silently downgrade to MDL version 1, as CLE Kuro 2 does not support v2 animations
+                orig_kuro_ver = 1 #Silently downgrade to MDL version 1, as CLE Kuro 2 / Kai does not support v2/4 animations
             else:
-                print("Warning!  Kuro 2 MDL detected and auto-downgrade not possible.  This MDL will crash the game.")
-                print("If using with CLE Kuro 2, please downgrade MDL prior to animation import.")
+                print("Warning!  v2+ MDL detected and auto-downgrade not possible.  This MDL will crash the game.")
+                print("If using with CLE Kuro 2 / Kai, please downgrade MDL prior to animation import.")
                 input("Press Enter to continue.")
         new_mdl_data += struct.pack("<I", orig_kuro_ver)
         new_mdl_data += f.read(4) #Not sure what this is in the header
