@@ -139,7 +139,10 @@ def dump_meshes (mesh_node, gltf, complete_maps = False):
         vgmap = {gltf.nodes[skin.joints[i]].name:i for i in range(len(skin.joints))}
     submeshes = []
     for i in range(len(mesh.primitives)):
-        submesh = {'name': '{0}_{1:02d}'.format(basename, i)}
+        if len(mesh.primitives) == 1 and gltf.materials[mesh.primitives[i].material].name == 'collision':
+            submesh = {'name': '{0}_collision'.format(basename)}
+        else:
+            submesh = {'name': '{0}_{1:02d}'.format(basename, i)}
         print("Reading mesh {0}...".format(submesh['name']))
         tops = {0: 'pointlist', 4: 'trianglelist', 5: 'trianglestrip'}
         submesh['fmt'] = {'stride': '0', 'topology': tops[mesh.primitives[i].mode],\
@@ -151,8 +154,9 @@ def dump_meshes (mesh_node, gltf, complete_maps = False):
         AlignedByteOffset = 0
         Semantics = {'POSITION': ['POSITION','0'], 'NORMAL': ['NORMAL','0'], 'TANGENT': ['TANGENT','0'],\
             'TEXCOORD_0': ['TEXCOORD','0'], 'TEXCOORD_1': ['TEXCOORD','1'], 'TEXCOORD_2': ['TEXCOORD','2'],\
-            'COLOR_0': ['COLOR','0'], 'COLOR_1': ['COLOR','1'], 'WEIGHTS_0': ['BLENDWEIGHT','0'],\
-            'JOINTS_0': ['BLENDINDICES','0']}
+            'TEXCOORD_3': ['TEXCOORD','3'], 'TEXCOORD_4': ['TEXCOORD','4'], 'TEXCOORD_5': ['TEXCOORD','5'],\
+            'TEXCOORD_6': ['TEXCOORD','6'], 'TEXCOORD_7': ['TEXCOORD','7'], 'COLOR_0': ['COLOR','0'],\
+            'COLOR_1': ['COLOR','1'], 'WEIGHTS_0': ['BLENDWEIGHT','0'], 'JOINTS_0': ['BLENDINDICES','0']}
         for semantic in Semantics:
             if hasattr(mesh.primitives[i].attributes, semantic):
                 accessor = getattr(mesh.primitives[i].attributes, semantic)
@@ -170,7 +174,8 @@ def dump_meshes (mesh_node, gltf, complete_maps = False):
                                 'InputSlotClass': 'per-vertex', 'InstanceDataStepRate': '0'}
                     elements.append(element)
                     AlignedByteOffset += accstride
-        if 'TANGENT' not in [x['SemanticName'] for x in submesh['vb']]:
+        vb_semantics = [x['SemanticName'] for x in submesh['vb']]
+        if ('TANGENT' not in vb_semantics and 'NORMAL' in vb_semantics and 'TEXCOORD' in vb_semantics):
             tangentBuf, binormalBuf = calc_tangents (submesh)
             submesh['vb'].append({'SemanticName': 'TANGENT', 'SemanticIndex': '0', 'Buffer': tangentBuf})
             element = {'id': str(len(elements)), 'SemanticName': 'TANGENT',\
@@ -234,16 +239,17 @@ def build_skeleton_struct (model_gltf, metadata = {}):
         new_to_old_node_ids = list(range(len(model_gltf.nodes)))
     old_to_new_node_ids = {new_to_old_node_ids[i]:i for i in range(len(new_to_old_node_ids))}
     for i in range(len(new_to_old_node_ids)):
-        skel_node = { "id_referenceonly": i, "name": model_gltf.nodes[new_to_old_node_ids[i]].name }
+        new_node = model_gltf.nodes[new_to_old_node_ids[i]]
+        skel_node = { "id_referenceonly": i, "name": new_node.name }
         transform = {}
-        if model_gltf.nodes[new_to_old_node_ids[i]].matrix is not None:
-                transform["pos_xyz"] = model_gltf.nodes[new_to_old_node_ids[i]].matrix[12:15]
-                transform["scale"] = [numpy.linalg.norm(model_gltf.nodes[new_to_old_node_ids[i]].matrix[0:3]),\
-                    numpy.linalg.norm(model_gltf.nodes[new_to_old_node_ids[i]].matrix[4:7]),\
-                    numpy.linalg.norm(model_gltf.nodes[new_to_old_node_ids[i]].matrix[8:11])]
-                r = numpy.array([(model_gltf.nodes[new_to_old_node_ids[i]].matrix[0:3]/transform["scale"][0]).tolist(),\
-                    (model_gltf.nodes[new_to_old_node_ids[i]].matrix[4:7]/transform["scale"][1]).tolist(),\
-                    (model_gltf.nodes[new_to_old_node_ids[i]].matrix[8:11]/transform["scale"][2]).tolist()]) # Row-major
+        if new_node.matrix is not None:
+                transform["pos_xyz"] = new_node.matrix[12:15]
+                transform["scale"] = [numpy.linalg.norm(new_node.matrix[0:3]),\
+                    numpy.linalg.norm(new_node.matrix[4:7]),\
+                    numpy.linalg.norm(new_node.matrix[8:11])]
+                r = numpy.array([(new_node.matrix[0:3]/transform["scale"][0]).tolist(),\
+                    (new_node.matrix[4:7]/transform["scale"][1]).tolist(),\
+                    (new_node.matrix[8:11]/transform["scale"][2]).tolist()]) # Row-major
                 # Enforce orthogonality of rotation matrix, Premelani W and Bizard P "Direction Cosine Matrix IMU: Theory" Diy Drone: Usa 1 (2009).
                 if (error := numpy.dot(r[0],r[1])) != 0.0:
                     vectors = [r[0]-(error/2)*r[1], r[1]-(error/2)*r[0]]
@@ -254,26 +260,26 @@ def build_skeleton_struct (model_gltf, metadata = {}):
                 q = Quaternion(matrix=r)
                 transform["rotation_euler_rpy"] = calc_rpy_from_q(q)
         else:
-            if model_gltf.nodes[new_to_old_node_ids[i]].translation is not None:
-                transform["pos_xyz"] = model_gltf.nodes[new_to_old_node_ids[i]].translation
+            if new_node.translation is not None:
+                transform["pos_xyz"] = new_node.translation
             else:
                 transform["pos_xyz"] = [0.0,0.0,0.0]
-            if model_gltf.nodes[new_to_old_node_ids[i]].rotation is not None:
-                q = Quaternion(model_gltf.nodes[new_to_old_node_ids[i]].rotation[3], model_gltf.nodes[new_to_old_node_ids[i]].rotation[0],\
-                    model_gltf.nodes[new_to_old_node_ids[i]].rotation[1], model_gltf.nodes[new_to_old_node_ids[i]].rotation[2])
+            if new_node.rotation is not None:
+                q = Quaternion(new_node.rotation[3], new_node.rotation[0],\
+                    new_node.rotation[1], new_node.rotation[2])
                 transform["rotation_euler_rpy"] = calc_rpy_from_q(q)
             else:
                 transform["rotation_euler_rpy"] = [0.0,0.0,0.0]
-            if model_gltf.nodes[new_to_old_node_ids[i]].scale is not None:
-                transform["scale"] = model_gltf.nodes[new_to_old_node_ids[i]].scale
+            if new_node.scale is not None:
+                transform["scale"] = new_node.scale
             else:
                 transform["scale"] = [1.0,1.0,1.0]
         if new_to_old_node_ids[i] in mesh_nodes:
             skel_node['type'] = 2
-            skel_node['mesh_index'] = model_gltf.nodes[new_to_old_node_ids[i]].mesh
+            skel_node['mesh_index'] = new_node.mesh
         else:
             if not locators == False:
-                if model_gltf.nodes[new_to_old_node_ids[i]].name in locators:
+                if new_node.name in locators:
                     skel_node['type'] = 0
                 else:
                     skel_node['type'] = 1
@@ -284,17 +290,21 @@ def build_skeleton_struct (model_gltf, metadata = {}):
                     skel_node['type'] = 1
             skel_node['mesh_index'] = -1
         skel_node['pos_xyz'] = transform["pos_xyz"]
-        skel_node['unknown_quat'] = [0.0,0.0,0.0,1.0]
+        skel_node['unknown_quat'] = (metadata['unknown_quat'][new_node.name]
+            if 'unknown_quat' in metadata and new_node.name in metadata['unknown_quat']
+            else [0.0,0.0,0.0,1.0])
         if new_to_old_node_ids[i] in skin_joints:
             skel_node['skin_mesh'] = 2
         else:
             skel_node['skin_mesh'] = 0
         skel_node['rotation_euler_rpy'] = transform["rotation_euler_rpy"]
         skel_node['scale'] = transform["scale"]
-        skel_node['unknown'] = [0.0,0.0,0.0]
+        skel_node['unknown'] = (metadata['unknown_vec3'][new_node.name]
+            if 'unknown_vec3' in metadata and new_node.name in metadata['unknown_vec3']
+            else [0.0,0.0,0.0])
         skel_node['children'] = []
-        if model_gltf.nodes[new_to_old_node_ids[i]].children is not None:
-            skel_node['children'] = [old_to_new_node_ids[j] for j in model_gltf.nodes[new_to_old_node_ids[i]].children]
+        if new_node.children is not None:
+            skel_node['children'] = [old_to_new_node_ids[j] for j in new_node.children]
         skel_struct.append(skel_node)
     return(skel_struct)
 
@@ -335,6 +345,7 @@ def process_gltf (gltf_filename, complete_maps = complete_vgmaps_default, overwr
         skel_struct = build_skeleton_struct (model_gltf, metadata)
         mesh_nodes = [x for x in model_gltf.nodes if x.mesh is not None]
         mesh_metadata = []
+        collision_flags = {'CF':64, 'CA':24, 'CK':16, 'CS':8, 'CI':4, 'CP':2}
         for mesh_node in mesh_nodes:
             submeshes = dump_meshes(mesh_node, model_gltf, complete_maps = complete_maps)
             mesh_node_metadata = { 'name': mesh_node.name, 'primitives': [] }
@@ -345,15 +356,25 @@ def process_gltf (gltf_filename, complete_maps = complete_vgmaps_default, overwr
                 if 'vgmap' in submeshes[i]:
                     with open('{0}/{1}_{2}.vgmap'.format(model_name, mesh_node.mesh, submeshes[i]['name']), 'wb') as f:
                         f.write(json.dumps(submeshes[i]['vgmap'], indent=4).encode("utf-8"))
-                mesh_node_metadata['primitives'].append({'id_referenceonly': i,\
-                    'material': model_gltf.materials[model_gltf.meshes[mesh_node.mesh].primitives[i].material].name})
+                if not model_gltf.materials[model_gltf.meshes[mesh_node.mesh].primitives[i].material].name == 'collision':
+                    mesh_node_metadata['primitives'].append({'id_referenceonly': i,\
+                        'material': model_gltf.materials[model_gltf.meshes[mesh_node.mesh].primitives[i].material].name})
             if not mesh_node.skin is None:
                 ibmtx_raw = read_stream(model_gltf, model_gltf.skins[mesh_node.skin].inverseBindMatrices)
                 bind_mtx = [numpy.linalg.inv(numpy.array([x[0:4],x[4:8],x[8:12],x[12:16]]).transpose()).transpose().tolist() for x in ibmtx_raw]
                 joint_names = [model_gltf.nodes[x].name for x in model_gltf.skins[mesh_node.skin].joints]
                 mesh_node_metadata['nodes'] = [{'name': joint_names[i], 'matrix': bind_mtx[i]} for i in range(len(bind_mtx))]
             bbox = define_bounding_box(submeshes)
-            mesh_node_metadata['section2'] = {'data': [bbox['min_x'], bbox['min_y'], bbox['min_z'], 0, bbox['max_x'], bbox['max_y'], bbox['max_z'], 0, 0, 0, 0]}
+            if 'section2_metadata' in metadata and mesh_node.name in metadata['section2_metadata']:
+                unk0 = metadata['section2_metadata'][mesh_node.name]["unk0"]
+                unk1 = metadata['section2_metadata'][mesh_node.name]["unk1"]
+                flags = metadata['section2_metadata'][mesh_node.name]["flags"]
+            else:
+                unk0 = 0
+                unk1 = 0
+                flags = collision_flags[mesh_node.name[0:2]] if mesh_node.name[0:2] in collision_flags else 0
+            mesh_node_metadata['section2'] = {"unk0": unk0, "unk1": unk1,
+                "flags": flags}
             mesh_metadata.append(mesh_node_metadata)
         with open('{0}/skeleton.json'.format(model_name), "wb") as f:
             f.write(json.dumps(skel_struct, indent=4).encode("utf-8"))    
