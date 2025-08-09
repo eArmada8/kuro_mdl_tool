@@ -384,9 +384,9 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                     giant_buffer +=output_buffer
                     gltf_data['animations'][0]['channels'].append(channel)
                     gltf_data['animations'][0]['samplers'].append(sampler)
+    section2_metadata = {}
     if not mesh_struct == False:
         material_dict = {gltf_data['materials'][i]['name']:i for i in range(len(gltf_data['materials']))}
-        section2_metadata = {}
         for i in range(len(mesh_struct["mesh_buffers"])): # Mesh
             if mesh_struct["mesh_blocks"][i]["node_count"] > 0:
                 has_skeleton = True
@@ -581,13 +581,14 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
             f.write(giant_buffer)
         with open(filename[:-4]+'.gltf', 'wb') as f:
             f.write(json.dumps(gltf_data, indent=4).encode("utf-8"))
-    with open(filename[:-4]+'.metadata', 'wb') as f:
-        f.write(json.dumps({ 'locators': [x['name'] for x in skel_struct if x['type'] == 0],
+    gltf_metadata = {'locators': [x['name'] for x in skel_struct if x['type'] == 0],
             'non_skin_meshes': [x['name'] for x in skel_struct if x['skin_mesh'] == 0],
-            'section2_metadata': section2_metadata,
             'unknown_quat': {x['name']: x['unknown_quat'] for x in skel_struct},
-            'unknown_vec3': {x['name']: x['unknown'] for x in skel_struct}},
-            indent=4).encode("utf-8"))
+            'unknown_vec3': {x['name']: x['unknown'] for x in skel_struct}}
+    if 'section2_metadata' in locals():
+        gltf_metadata['section2_metadata'] = section2_metadata
+    with open(filename[:-4]+'.metadata', 'wb') as f:
+        f.write(json.dumps(gltf_metadata, indent=4).encode("utf-8"))
 
 def process_mdl (mdl_file, overwrite = False, write_glb = True, dump_extra_animation_data = False, calc_ibm = True):
     with open(mdl_file, "rb") as f:
