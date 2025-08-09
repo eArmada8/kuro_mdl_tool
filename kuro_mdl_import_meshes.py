@@ -14,7 +14,7 @@
 # GitHub eArmada8/kuro_mdl_tool
 
 try:
-    import io, struct, sys, os, shutil, glob, base64, json, blowfish, operator, zstandard
+    import io, struct, numpy, sys, os, shutil, glob, base64, json, blowfish, operator, zstandard
     from itertools import chain
     from lib_fmtibvb import *
     from kuro_mdl_export_meshes import *
@@ -166,6 +166,111 @@ def build_material_section (mdl_filename, material_list = [], kuro_ver = 1):
         output_buffer += material_block
     return(struct.pack("<2I", 0, len(output_buffer)) + output_buffer)
 
+# Calculate the normal vector for a collision mesh triangle.
+def triangle_normal(pos_vector):
+    pos = numpy.array(pos_vector)
+    calc_nrm = numpy.cross(pos[1] - pos[0], pos[2] - pos[0])
+    calc_nrm = calc_nrm / numpy.linalg.norm(calc_nrm)
+    return calc_nrm
+
+# Calculate the circumsphere for a collision mesh triangle.  This function is written by chatgpt.
+# Gratitude and credit to chatgpt and all the code that went into its training and their authors.
+def circumsphere(pos_vector):
+    pos = numpy.array(pos_vector)
+
+    if numpy.dot(pos[1] - pos[0], pos[2] - pos[0]) <= 0: return (pos[1] + pos[2]) / 2, numpy.linalg.norm(pos[1] - pos[2]) / 2
+    if numpy.dot(pos[0] - pos[1], pos[2] - pos[1]) <= 0: return (pos[0] + pos[2]) / 2, numpy.linalg.norm(pos[0] - pos[2]) / 2
+    if numpy.dot(pos[0] - pos[2], pos[1] - pos[2]) <= 0: return (pos[0] + pos[1]) / 2, numpy.linalg.norm(pos[0] - pos[1]) / 2
+
+    # For an acute triangle, we must compute the circumcenter.
+    # First, construct an orthonormal basis (u, v) for the plane of the triangle.
+    u = pos[1] - pos[0]
+    u = u / numpy.linalg.norm(u)
+    # The normal to the plane
+    normal = numpy.cross(pos[1] - pos[0], pos[2] - pos[0])
+    normal = normal / numpy.linalg.norm(normal)
+    # The in-plane vector perpendicular to u
+    v = numpy.cross(normal, u)
+
+    # Project points pos[1] and pos[2] onto the (u,v) coordinate system with pos[0] as the origin.
+    pB = numpy.array([numpy.linalg.norm(pos[1] - pos[0]), 0])
+    pC = numpy.array([numpy.dot(pos[2] - pos[0], u), numpy.dot(pos[2] - pos[0], v)])
+
+    # Solve for the circumcenter in 2D.
+    # The perpendicular bisector of the segment from (0,0) to pB has the equation:
+    #   pB[0]*x + pB[1]*y = 0.5 * (||pB||^2)
+    # Similarly for the segment from (0,0) to pC.
+    M = numpy.array([[pB[0], pB[1]], [pC[0], pC[1]]])
+    b_vec = numpy.array([0.5 * numpy.dot(pB, pB), 0.5 * numpy.dot(pC, pC)])
+
+    # Solve the linear system to get the 2D circumcenter coordinates (x, y)
+    circumcenter_2d = numpy.linalg.solve(M, b_vec)
+
+    # Map the 2D circumcenter back to 3D
+    center = pos[0] + circumcenter_2d[0] * u + circumcenter_2d[1] * v
+    radius = numpy.linalg.norm(center - pos[0])
+
+    return (center, radius)
+
+# Takes a collision mesh struct with raw buffers and outputs the triangles in the format the Kuro engine expects
+def generate_triangle_struct(mesh_struct):
+    triangle_struct = []
+    posidx = [x['SemanticName'] for x in mesh_struct['vb']].index('POSITION')
+    for i in range(len(mesh_struct['ib'])):
+        pos_vector = [mesh_struct['vb'][posidx]['Buffer'][j] for j in mesh_struct['ib'][i]]
+        nrm_vector = triangle_normal(pos_vector)
+        midpoint, radius = circumsphere(pos_vector)
+        triangle = {'pos': pos_vector, 'nrm': nrm_vector.tolist(), 'midpoint': midpoint.tolist(), 'radius': radius.tolist()}
+        triangle_struct.append(triangle)
+    return triangle_struct
+
+# This is specifically for constructing the BVH tree, and takes a triangle struct in the collision mesh format
+def bounding_box (triangles):
+    x = [x[0] for y in triangles for x in y[1]['pos']]
+    y = [x[1] for y in triangles for x in y[1]['pos']]
+    z = [x[2] for y in triangles for x in y[1]['pos']]
+    return([[min(x), min(y), min(z)], [max(x), max(y), max(z)]])
+
+class BVHNode:  # Self-running recursive class to build a bounding volume hierarchy node tree
+    def __init__(self, triangles, max_per_node = 2):
+        self.bounds = bounding_box(triangles)
+        self.children = []  # Always 0 or 2 elements
+        self.tri_indices = []  # Stores indices of triangles
+        if len(triangles) > max_per_node:
+            axis_len = list(enumerate([max([x[1]['midpoint'][0] for x in triangles]) - min([x[1]['midpoint'][0] for x in triangles]),
+                max([x[1]['midpoint'][1] for x in triangles]) - min([x[1]['midpoint'][1] for x in triangles]),
+                max([x[1]['midpoint'][2] for x in triangles]) - min([x[1]['midpoint'][2] for x in triangles])]))
+            a = [x[0] for x in sorted(axis_len, key = lambda e: e[1], reverse = True)] # Axes longest to shortest
+            sorted_triangles = sorted(triangles, key = lambda x: (x[1]['midpoint'][a[0]], x[1]['midpoint'][a[1]], x[1]['midpoint'][a[2]]))
+            set1 = sorted_triangles[:len(sorted_triangles)//2]
+            set2 = sorted_triangles[len(sorted_triangles)//2:]
+            self.children = [BVHNode(set1, max_per_node), BVHNode(set2, max_per_node)]
+        else:
+            self.tri_indices = [x[0] for x in triangles]
+
+# node is of type BVHNode class, run with root node
+def add_node_to_BVH_list (node, node_list = [{}], i = 0): # i is current node
+    node_list[i]['min'] = node.bounds[0]
+    node_list[i]['max'] = node.bounds[1]
+    if len(node.children) > 0:
+        node_list[i]['start'] = len(node_list)
+        node_list[i]['end'] = len(node_list) + len(node.children) - 1
+        node_list[i]['triangles'] = []
+        new_children_indices = []
+        for j in range(len(node.children)):
+            new_children_indices.append(len(node_list))
+            node_list.append({})
+        for j in range(len(node.children)):
+            node_list = add_node_to_BVH_list(node.children[j], node_list, new_children_indices[j])
+    else:
+        node_list[i]['start'] = -1
+        node_list[i]['end'] = -1
+        node_list[i]['triangles'] = node.tri_indices
+    return(node_list)
+
+def triangle_struct_to_bvh_node_list (triangle_struct):
+    return (add_node_to_BVH_list(BVHNode(list(enumerate(triangle_struct))), [{}], 0))
+
 def build_mesh_section (mdl_filename, kuro_ver = 1):
     # Ordinarily we do not need to parse the original file, but in case we do, we only want to do it once
     has_parsed_original_file = False
@@ -193,6 +298,8 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
             expected_vgmap = {mesh_struct_metadata[i]['nodes'][j]['name']:j for j in range(len(mesh_struct_metadata[i]['nodes']))}
         else:
             expected_vgmap = {}
+        # Initialize bounding box - I have no idea why this works, but it does.
+        bbox = {'min_x': True, 'min_y': True, 'min_z': True, 'max_x': False, 'max_y': False, 'max_z': False}
         for j in range(len(mesh_struct_metadata[i]["primitives"])):
             try:
                 mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, safe_filename, j)
@@ -277,6 +384,19 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                 match vb[k]["SemanticName"]:
                     case "POSITION":
                         type_int = 0
+                        #Bounding box
+                        bbox_min = [min(x[0] for x in vb[k]["Buffer"]),
+                            min(x[1] for x in vb[k]["Buffer"]),
+                            min(x[2] for x in vb[k]["Buffer"])]
+                        bbox_max = [max(x[0] for x in vb[k]["Buffer"]),
+                            max(x[1] for x in vb[k]["Buffer"]),
+                            max(x[2] for x in vb[k]["Buffer"])]
+                        bbox['min_x'] = min(bbox['min_x'], bbox_min[0])
+                        bbox['min_y'] = min(bbox['min_y'], bbox_min[1])
+                        bbox['min_z'] = min(bbox['min_z'], bbox_min[2])
+                        bbox['max_x'] = max(bbox['max_x'], bbox_max[0])
+                        bbox['max_y'] = max(bbox['max_y'], bbox_max[1])
+                        bbox['max_z'] = max(bbox['max_z'], bbox_max[2])
                     case "NORMAL":
                         type_int = 1
                         eval_buffer_len = True
@@ -372,8 +492,53 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                 node_block += make_pascal_string(mesh_struct_metadata[i]["nodes"][j]["name"])
                 node_block += struct.pack("<16f", *list(chain.from_iterable(mesh_struct_metadata[i]["nodes"][j]["matrix"])))
         mesh_block += node_block
-        raw_section2 = struct.pack("<3fI3f4I", *mesh_struct_metadata[i]["section2"]["data"])
-        section2_block = struct.pack("<I", len(raw_section2)) + raw_section2
+        if "data" in mesh_struct_metadata[i]["section2"]: # Legacy mode
+            raw_section2 = struct.pack("<3fI3f4I", *mesh_struct_metadata[i]["section2"]["data"])
+        else: # Decoded data
+            collision_present = True
+            try:
+                mesh_filename = mdl_filename + '/{0}_{1}_collision'.format(i, safe_filename)
+                fmt = read_fmt(mesh_filename + '.fmt')
+                ib = read_ib(mesh_filename + '.ib', fmt)
+                vb = read_vb(mesh_filename + '.vb', fmt)
+            except FileNotFoundError:
+                collision_present = False
+            if collision_present:
+                triangle_struct = generate_triangle_struct({'fmt': fmt, 'ib': ib, 'vb': vb})
+                node_list = triangle_struct_to_bvh_node_list(triangle_struct)
+                # I think I could just read the root node for the bounding box
+                # because collision and visible meshes are separated, but just in case...
+                bbox['min_x'] = min(bbox['min_x'], node_list[0]['min'][0])
+                bbox['min_y'] = min(bbox['min_y'], node_list[0]['min'][1])
+                bbox['min_z'] = min(bbox['min_z'], node_list[0]['min'][2])
+                bbox['max_x'] = max(bbox['max_x'], node_list[0]['max'][0])
+                bbox['max_y'] = max(bbox['max_y'], node_list[0]['max'][1])
+                bbox['max_z'] = max(bbox['max_z'], node_list[0]['max'][2])
+            raw_section2 = bytearray(struct.pack("<3fI3fI", bbox['min_x'], bbox['min_y'], bbox['min_z'],
+                mesh_struct_metadata[i]["section2"]["unk0"],
+                bbox['max_x'], bbox['max_y'],bbox['max_z'],
+                mesh_struct_metadata[i]["section2"]["unk1"]))
+            if collision_present:
+                raw_section2.extend(struct.pack("<I", len(triangle_struct)))
+                for j in range(len(triangle_struct)):
+                    raw_section2.extend(struct.pack("<16f",
+                        *[x for y in triangle_struct[j]['pos'] for x in y],
+                        *triangle_struct[j]['nrm'],
+                        *triangle_struct[j]['midpoint'],
+                        triangle_struct[j]['radius']))
+                raw_section2.extend(struct.pack("<I", len(node_list)))
+                for j in range(len(node_list)):
+                    raw_section2.extend(struct.pack("<6f2iI{}I".format(len(node_list[j]['triangles'])),
+                        *node_list[j]['min'],
+                        *node_list[j]['max'],
+                        node_list[j]['start'],
+                        node_list[j]['end'],
+                        len(node_list[j]['triangles']),
+                        *node_list[j]['triangles']))
+            else:
+                raw_section2.extend(struct.pack("<2I", 0, 0))
+            raw_section2.extend(struct.pack("<I", mesh_struct_metadata[i]["section2"]["flags"]))
+        section2_block = struct.pack("<I", len(raw_section2)) + bytes(raw_section2)
         mesh_block = make_pascal_string(mesh_struct_metadata[i]["name"]) + struct.pack("<I", len(mesh_block)) + mesh_block + section2_block
         output_buffer += mesh_block
         mesh_section_buffer = struct.pack("<2I", 1, len(output_buffer)) + output_buffer
