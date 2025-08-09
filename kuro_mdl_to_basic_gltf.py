@@ -447,6 +447,11 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                 primitives.append(primitive)
                 del(submesh)
             if "collision_mesh" in mesh_struct["mesh_collision_data"][i]:
+                if 'collision' in [x['name'] for x in gltf_data['materials']]:
+                    material_idx = [x['name'] for x in gltf_data['materials']].index('collision')
+                else:
+                    material_idx = len(gltf_data['materials'])
+                    gltf_data['materials'].append({'name': 'collision'})
                 print("Processing {0} collision mesh...".format(mesh_struct["mesh_blocks"][i]["name"]))
                 submesh = mesh_struct["mesh_collision_data"][i]["collision_mesh"]
                 gltf_fmt = convert_fmt_for_gltf(submesh['fmt'])
@@ -500,6 +505,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                 ib_stream.close()
                 del(ib_stream)
                 primitive["mode"] = 4 #TRIANGLES
+                primitive["material"] = material_idx
                 primitives.append(primitive)
                 del(submesh)
             if mesh_struct["mesh_blocks"][i]["name"] in [x['name'] for x in gltf_data['nodes']]:
