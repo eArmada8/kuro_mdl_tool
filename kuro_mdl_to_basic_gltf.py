@@ -446,6 +446,62 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                     primitive["material"] = material_dict[mesh_struct['mesh_blocks'][i]['primitives'][j]['material']]
                 primitives.append(primitive)
                 del(submesh)
+            if "collision_mesh" in mesh_struct["mesh_collision_data"][i]:
+                print("Processing {0} collision mesh...".format(mesh_struct["mesh_blocks"][i]["name"]))
+                submesh = mesh_struct["mesh_collision_data"][i]["collision_mesh"]
+                gltf_fmt = convert_fmt_for_gltf(submesh['fmt'])
+                primitive = {"attributes":{}}
+                vb_stream = io.BytesIO()
+                write_vb_stream(submesh['vb'], vb_stream, gltf_fmt, e='<', interleave = False)
+                block_offset = len(giant_buffer)
+                for element in range(len(gltf_fmt['elements'])):
+                    primitive["attributes"][gltf_fmt['elements'][element]['SemanticName']]\
+                        = len(gltf_data['accessors'])
+                    gltf_data['accessors'].append({"bufferView" : len(gltf_data['bufferViews']),\
+                        "componentType": gltf_fmt['elements'][element]['componentType'],\
+                        "count": len(submesh['vb'][element]['Buffer']),\
+                        "type": gltf_fmt['elements'][element]['accessor_type']})
+                    if gltf_fmt['elements'][element]['SemanticName'] == 'POSITION':
+                        gltf_data['accessors'][-1]['max'] =\
+                            [max([x[0] for x in submesh['vb'][element]['Buffer']]),\
+                             max([x[1] for x in submesh['vb'][element]['Buffer']]),\
+                             max([x[2] for x in submesh['vb'][element]['Buffer']])]
+                        gltf_data['accessors'][-1]['min'] =\
+                            [min([x[0] for x in submesh['vb'][element]['Buffer']]),\
+                             min([x[1] for x in submesh['vb'][element]['Buffer']]),\
+                             min([x[2] for x in submesh['vb'][element]['Buffer']])]
+                    gltf_data['bufferViews'].append({"buffer": 0,\
+                        "byteOffset": block_offset,\
+                        "byteLength": len(submesh['vb'][element]['Buffer']) *\
+                        gltf_fmt['elements'][element]['componentStride'],\
+                        "target" : 34962})
+                    block_offset += len(submesh['vb'][element]['Buffer']) *\
+                        gltf_fmt['elements'][element]['componentStride']
+                vb_stream.seek(0)
+                giant_buffer += vb_stream.read()
+                vb_stream.close()
+                del(vb_stream)
+                ib_stream = io.BytesIO()
+                write_ib_stream(submesh['ib'], ib_stream, gltf_fmt, e='<')
+                # IB is 16-bit so can be misaligned, unlike VB (which only has 32-, 64- and 128-bit types in Kuro)
+                while (ib_stream.tell() % 4) > 0:
+                    ib_stream.write(b'\x00')
+                primitive["indices"] = len(gltf_data['accessors'])
+                gltf_data['accessors'].append({"bufferView" : len(gltf_data['bufferViews']),\
+                    "componentType": gltf_fmt['componentType'],\
+                    "count": len([index for triangle in submesh['ib'] for index in triangle]),\
+                    "type": gltf_fmt['accessor_type']})
+                gltf_data['bufferViews'].append({"buffer": 0,\
+                    "byteOffset": len(giant_buffer),\
+                    "byteLength": ib_stream.tell(),\
+                    "target" : 34963})
+                ib_stream.seek(0)
+                giant_buffer += ib_stream.read()
+                ib_stream.close()
+                del(ib_stream)
+                primitive["mode"] = 4 #TRIANGLES
+                primitives.append(primitive)
+                del(submesh)
             if mesh_struct["mesh_blocks"][i]["name"] in [x['name'] for x in gltf_data['nodes']]:
                 mesh_node = [j for j in range(len(gltf_data['nodes']))\
                     if gltf_data['nodes'][j]['name'] == mesh_struct["mesh_blocks"][i]["name"]][0]
