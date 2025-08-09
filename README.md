@@ -10,9 +10,11 @@ Please see the [wiki](https://github.com/eArmada8/kuro_mdl_tool/wiki), and the d
 
 The code to decrypt and decompress CLE assets comes from KuroTools (https://github.com/nnguyen259/KuroTools), and I also looked through MDL convertor in KuroTools by TwnKey (github.com/TwnKey) to understand the MDL format.  weskeryiu also provided many insights into the MDL format via in-game experimentation, and helped find numerous bugs in these scripts.
 
+Much of the collision mesh structure in the MDL format was elucidated by Kyuuhachi, who also helped me to figure out the bounding volume hierarchy and how to rebuild the mesh structure.
+
 None of this would be possible without the work of DarkStarSword and his amazing 3DMigoto-Blender plugin, of course.
 
-I am very thankful for uyjulian, TwnKey, weskeryiu, DarkStarSword, the KuroTools team and the Kiseki modding discord for their brilliant work and for sharing that work so freely.
+I am very thankful for uyjulian, TwnKey, weskeryiu, Kyuuhachi, DarkStarSword, the KuroTools team and the Kiseki modding discord for their brilliant work and for sharing that work so freely.
 
 ## Requirements:
 1. Python 3.10 and newer is required for use of these scripts.  It is free from the Microsoft Store, for Windows users.  For Linux users, please consult your distro.
@@ -36,6 +38,9 @@ Shows help message.
 
 `-t, --trim_for_gpu`
 Trim vertex buffer for GPU injection (3DMigoto).  Meshes in the MDL contain have 15 vertex buffers (position, normal, tangent, 8x texcoord, 2x color, blendweights and blendindices).  Only 8 of these are actually loaded into GPU memory for most characters (only the first 3 texcoords are loaded, and the 2x color are not loaded).  This option produces smaller .vb files (with matching .fmt files) with the extraneous buffers discarded, so that upon splitting, the buffers can be used for injection with 3DMigoto.  (See here for my vertex buffer splitting tool: https://github.com/eArmada8/vbuffer_merge_split/blob/main/kuro/kuro_vb_split.py)
+
+`-d, --dump_collision_nodes`
+Dump collision BVH nodes in JSON format.  This is completely unnecessary for modding, and is an included option for debugging purposes.
 
 `-o, --overwrite`
 Overwrite existing files without prompting.
@@ -103,7 +108,7 @@ I do not recommend directly editing skeleton.json, although it certainly is poss
 ### kuro_mdl_to_basic_gltf.py
 Double click the python script to run and it will attempt to convert the MDL model into a basic glTF model, with skeleton (in .glb format).  This tool as written is for obtaining the skeleton for rigging the .fmt/.ib/.vb/.vgmap meshes from the export tool.  *The meshes included in the model are not particularly useful as they cannot be exported back to MDL,* just delete them and import the exported meshes (.fmt/.ib/.vb./vgmap) instead - the tool only includes meshes because Blender refuses to open a glTF file without meshes.  After importing the meshes, Ctrl-click on the armature and parent (Object -> Parent -> Armature Deform {without the extra options}).
 
-The script has basic texture support.  Place all the textures required in the same folder as the .glb file, in .dds format.  Blender does not support BC7 textures, so convert to BC1/BC3 first.
+The script has basic texture support.  Place all the textures required in the same folder as the .glb file, in .dds format.  Blender does not support BC7 textures, so convert to BC1/BC3 first.  (Note:  Collision meshes do not have any textures of course, but will be assigned to an empty material named `collision` for ease of extraction.)
 
 Animations will also be converted into glTF (in .glb format).  The glb files can be directly imported into Blender, but Bone Dir must be set to "Blender (best for re-importing)" upon import or the skeleton will be altered irreversibly, preventing the animation from being used in the game.  (Repacking animations is not yet supported.)  Using the files directly is not recommended; instead decompile the base model as well, and put the .glb file in the same folder with the animations and run kuro_merge_model_into_animations.py in that folder. It will insert the model data including meshes / skins / texture references etc into the animation .glb, which will make animation feasible.  This tool only supports translation, rotation and scale animation channels.  *If you run this tool on an animation that exclusively utilizes the shader varying or uv scrolling channels, you will end up with an empty .glb.  You can examine the unsupported channels in json format using the --dumpanidata command.*
 
@@ -184,6 +189,13 @@ Many modders prefer that complete VGmaps is the default, rather than a command l
 which you can change to 
 `complete_vgmaps_default = True`
 This will also change the command line argument `-c, --completemaps` into `-p, --partialmaps` which you would call to enable non-empty group vgmaps instead.
+
+### Some notes about collision meshes
+
+- Most maps will have collision meshes.  The kuro engine games seem to expect collision meshes to be on their own nodes, with a single collision mesh per node.  Please adhere to this restriction when working with these meshes.  Do not attempt to combine visible meshes with collision meshes on the same node.
+- All collision meshes are one-sided, with the opaque side (the side with the normal vector) being the side that prevents passage.
+- Collision meshes are exported as a mesh with the position semantic only, and only the position semantic (and faces of course) is used when importing - all other semantics (e.g. normal, tangent, uv) will be ignored if you have added them to the raw buffers.
+- When using kuro_mdl_to_basic_gltf.py to export to glTF, an empty material called `collision` will be assigned to all collision meshes, to mark them as collision meshes.  When dumping meshes to raw buffers for building an MDL, kuro_gltf_to_meshes.py will use the `collision` material to know which meshes to convert from visible to collision, assuming there is no more than one submesh in the mesh.  Collision flags are stored in the .metadata file generated by kuro_mdl_to_basic_gltf.py; if they are not present then kuro_gltf_to_meshes.py will guess based on the first two letters of the node name.
 
 ### cle_compress.py
 This script will compress and encrypt files with zstandard so they can be used in Kuro no Kiseki 2 (CLE release).  If double-clicked, it will compress and encrypt all files it finds in the current directory, assuming they are not .py, .bak, or already compressed.  This is not necessary with output from the importer since the files are already compressed, but would be needed for textures, etc.  MDL and DDS files will be compressed only, as the game does not expect them to be not encrypted.

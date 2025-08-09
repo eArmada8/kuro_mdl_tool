@@ -75,7 +75,8 @@ def convert_format_for_gltf(dxgi_format):
         if numtype in ['FLOAT', 'UNORM', 'SNORM']:
             componentType = 5126
             componentStride = len(re.findall('[0-9]+', dxgi_format)) * 4
-            dxgi_format = "".join(['R32','G32','B32','A32','D32'][0:componentStride//4]) + "_FLOAT"
+            dxgi_format = "".join([x+'32' for x in re.findall('[A-Z]+', dxgi_format.split('_')[0])]
+                [0:componentStride//4]) + "_FLOAT"
         elif numtype == 'UINT':
             if vec_bits == 32:
                 componentType = 5125
@@ -158,6 +159,15 @@ def fix_weight_groups(submesh, global_node_dict):
             #if (new_submesh['vb'][weight_element_index]['Buffer'][i][j] < 0.0000001):
                 #new_submesh['vb'][weight_element_index]['Buffer'][i][j] = 0
     return(new_submesh)
+
+# glTF does not support BGRA colors, reverse if BGRA
+def fix_color_order(submesh, gltf_fmt):
+    color_elements = [int(x['id']) for x in gltf_fmt['elements'] if x['SemanticName'][0:5] == 'COLOR']
+    for i in color_elements:
+        if "".join(re.findall('[RGB]+', gltf_fmt['elements'][i]['Format'])) == 'BGR':
+            submesh['vb'][i]['Buffer'] = [[x[2],x[1],x[0]]+x[3:] for x in submesh['vb'][i]['Buffer']]
+            gltf_fmt['elements'][i]['Format'] = gltf_fmt['elements'][i]['Format'].replace("R","b").replace("B","r").upper()
+    return(submesh, gltf_fmt)
 
 # glTF does not support VEC4 normals, strip off the last value if .mdl using R8G8B8A8_SNORM
 def fix_normal_length(submesh, gltf_fmt):
@@ -374,6 +384,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                     giant_buffer +=output_buffer
                     gltf_data['animations'][0]['channels'].append(channel)
                     gltf_data['animations'][0]['samplers'].append(sampler)
+    section2_metadata = {}
     if not mesh_struct == False:
         material_dict = {gltf_data['materials'][i]['name']:i for i in range(len(gltf_data['materials']))}
         for i in range(len(mesh_struct["mesh_buffers"])): # Mesh
@@ -391,6 +402,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                 else:
                     submesh = mesh_struct["mesh_buffers"][i][j]
                 gltf_fmt = convert_fmt_for_gltf(make_fmt_struct(submesh))
+                submesh, gltf_fmt = fix_color_order(submesh, gltf_fmt)
                 submesh, gltf_fmt = fix_normal_length(submesh, gltf_fmt)
                 primitive = {"attributes":{}}
                 vb_stream = io.BytesIO()
@@ -446,6 +458,68 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                     primitive["material"] = material_dict[mesh_struct['mesh_blocks'][i]['primitives'][j]['material']]
                 primitives.append(primitive)
                 del(submesh)
+            if "collision_mesh" in mesh_struct["mesh_collision_data"][i]:
+                if 'collision' in [x['name'] for x in gltf_data['materials']]:
+                    material_idx = [x['name'] for x in gltf_data['materials']].index('collision')
+                else:
+                    material_idx = len(gltf_data['materials'])
+                    gltf_data['materials'].append({'name': 'collision'})
+                print("Processing {0} collision mesh...".format(mesh_struct["mesh_blocks"][i]["name"]))
+                submesh = mesh_struct["mesh_collision_data"][i]["collision_mesh"]
+                gltf_fmt = convert_fmt_for_gltf(submesh['fmt'])
+                primitive = {"attributes":{}}
+                vb_stream = io.BytesIO()
+                write_vb_stream(submesh['vb'], vb_stream, gltf_fmt, e='<', interleave = False)
+                block_offset = len(giant_buffer)
+                for element in range(len(gltf_fmt['elements'])):
+                    primitive["attributes"][gltf_fmt['elements'][element]['SemanticName']]\
+                        = len(gltf_data['accessors'])
+                    gltf_data['accessors'].append({"bufferView" : len(gltf_data['bufferViews']),\
+                        "componentType": gltf_fmt['elements'][element]['componentType'],\
+                        "count": len(submesh['vb'][element]['Buffer']),\
+                        "type": gltf_fmt['elements'][element]['accessor_type']})
+                    if gltf_fmt['elements'][element]['SemanticName'] == 'POSITION':
+                        gltf_data['accessors'][-1]['max'] =\
+                            [max([x[0] for x in submesh['vb'][element]['Buffer']]),\
+                             max([x[1] for x in submesh['vb'][element]['Buffer']]),\
+                             max([x[2] for x in submesh['vb'][element]['Buffer']])]
+                        gltf_data['accessors'][-1]['min'] =\
+                            [min([x[0] for x in submesh['vb'][element]['Buffer']]),\
+                             min([x[1] for x in submesh['vb'][element]['Buffer']]),\
+                             min([x[2] for x in submesh['vb'][element]['Buffer']])]
+                    gltf_data['bufferViews'].append({"buffer": 0,\
+                        "byteOffset": block_offset,\
+                        "byteLength": len(submesh['vb'][element]['Buffer']) *\
+                        gltf_fmt['elements'][element]['componentStride'],\
+                        "target" : 34962})
+                    block_offset += len(submesh['vb'][element]['Buffer']) *\
+                        gltf_fmt['elements'][element]['componentStride']
+                vb_stream.seek(0)
+                giant_buffer += vb_stream.read()
+                vb_stream.close()
+                del(vb_stream)
+                ib_stream = io.BytesIO()
+                write_ib_stream(submesh['ib'], ib_stream, gltf_fmt, e='<')
+                # IB is 16-bit so can be misaligned, unlike VB (which only has 32-, 64- and 128-bit types in Kuro)
+                while (ib_stream.tell() % 4) > 0:
+                    ib_stream.write(b'\x00')
+                primitive["indices"] = len(gltf_data['accessors'])
+                gltf_data['accessors'].append({"bufferView" : len(gltf_data['bufferViews']),\
+                    "componentType": gltf_fmt['componentType'],\
+                    "count": len([index for triangle in submesh['ib'] for index in triangle]),\
+                    "type": gltf_fmt['accessor_type']})
+                gltf_data['bufferViews'].append({"buffer": 0,\
+                    "byteOffset": len(giant_buffer),\
+                    "byteLength": ib_stream.tell(),\
+                    "target" : 34963})
+                ib_stream.seek(0)
+                giant_buffer += ib_stream.read()
+                ib_stream.close()
+                del(ib_stream)
+                primitive["mode"] = 4 #TRIANGLES
+                primitive["material"] = material_idx
+                primitives.append(primitive)
+                del(submesh)
             if mesh_struct["mesh_blocks"][i]["name"] in [x['name'] for x in gltf_data['nodes']]:
                 mesh_node = [j for j in range(len(gltf_data['nodes']))\
                     if gltf_data['nodes'][j]['name'] == mesh_struct["mesh_blocks"][i]["name"]][0]
@@ -480,6 +554,10 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                     "byteLength": len(inv_mtx_buffer)})
                 giant_buffer += inv_mtx_buffer
             gltf_data['scenes'][0]['nodes'].append(mesh_node)
+            section2_metadata[mesh_struct["mesh_blocks"][i]["name"]] = {
+                'unk0': mesh_struct["mesh_blocks"][i]["section2"]["unk0"],
+                'unk1': mesh_struct["mesh_blocks"][i]["section2"]["unk1"],
+                'flags': mesh_struct["mesh_blocks"][i]["section2"]["flags"]}
     else:
         skin = {}
         skin['skeleton'] = 0
@@ -503,9 +581,14 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
             f.write(giant_buffer)
         with open(filename[:-4]+'.gltf', 'wb') as f:
             f.write(json.dumps(gltf_data, indent=4).encode("utf-8"))
+    gltf_metadata = {'locators': [x['name'] for x in skel_struct if x['type'] == 0],
+            'non_skin_meshes': [x['name'] for x in skel_struct if x['skin_mesh'] == 0],
+            'unknown_quat': {x['name']: x['unknown_quat'] for x in skel_struct},
+            'unknown_vec3': {x['name']: x['unknown'] for x in skel_struct}}
+    if 'section2_metadata' in locals():
+        gltf_metadata['section2_metadata'] = section2_metadata
     with open(filename[:-4]+'.metadata', 'wb') as f:
-        f.write(json.dumps({ 'locators': [x['name'] for x in skel_struct if x['type'] == 0],\
-            'non_skin_meshes': [x['name'] for x in skel_struct if x['skin_mesh'] == 0] }, indent=4).encode("utf-8"))
+        f.write(json.dumps(gltf_metadata, indent=4).encode("utf-8"))
 
 def process_mdl (mdl_file, overwrite = False, write_glb = True, dump_extra_animation_data = False, calc_ibm = True):
     with open(mdl_file, "rb") as f:
@@ -517,7 +600,7 @@ def process_mdl (mdl_file, overwrite = False, write_glb = True, dump_extra_anima
     if (overwrite == True) or not (os.path.exists(mdl_file[:-4] + '.gltf') or os.path.exists(mdl_file[:-4] + '.glb')):
         mdl_data = decryptCLE(mdl_data)
         material_struct = obtain_material_data(mdl_data)
-        mesh_struct = obtain_mesh_data(mdl_data, material_struct = material_struct, trim_for_gpu = True)
+        mesh_struct = obtain_mesh_data(mdl_data, material_struct = material_struct, trim_for_gpu = False)
         skel_struct = process_skeleton_data(obtain_skeleton_data(mdl_data))
         ani_data = isolate_animation_data(mdl_data)
         ani_struct = obtain_animation_data(ani_data)

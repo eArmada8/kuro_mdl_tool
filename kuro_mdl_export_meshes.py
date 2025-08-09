@@ -13,7 +13,7 @@
 # GitHub eArmada8/kuro_mdl_tool
 
 try:
-    import io, struct, sys, os, glob, base64, json, blowfish, operator, zstandard, xxhash
+    import io, struct, sys, os, glob, base64, json, blowfish, operator, zstandard, xxhash, numpy
     from itertools import chain
     from lib_fmtibvb import *
 except ModuleNotFoundError as e:
@@ -203,6 +203,7 @@ def obtain_mesh_data (mdl_data, material_struct, trim_for_gpu = False):
         blocks, = struct.unpack("<I",f.read(4))
         mesh_blocks = []
         mesh_block_buffers = []
+        mesh_collision_data = []
         # Meshes are separated into groups (hair, body, shadow)
         for i in range(blocks):
             mesh_block = {}
@@ -372,18 +373,58 @@ def obtain_mesh_data (mdl_data, material_struct, trim_for_gpu = False):
                         struct.unpack("<4f",f.read(16)), struct.unpack("<4f",f.read(16))]
                     nodes.append(node)
                 mesh_block["nodes"] = nodes
-            section2 = {} # No idea what this is
+            mesh_block_collision_data = {}
+            section2 = {} # Collision metadata, thank you to Kyuuhachi for unwinding this data!
             section2["size"], = struct.unpack("<I", f.read(4))
-            if section2["size"] == 44:
-                section2["data"] = struct.unpack("<3fI3f4I", f.read(44))
-            else:
-                f.seek(section2["size"],1)
+            section2["minbound"] = list(struct.unpack("<3f", f.read(12)))
+            section2["unk0"], = struct.unpack("<I", f.read(4))
+            section2["maxbound"] = list(struct.unpack("<3f", f.read(12)))
+            section2["unk1"], = struct.unpack("<I", f.read(4))
+            section2["num_triangles"], = struct.unpack("<I", f.read(4))
+            if section2["num_triangles"] > 0:
+                vert_buffer = []
+                idx_buffer = []
+                for j in range(section2["num_triangles"]):
+                    pos = numpy.array([list(struct.unpack("<3f", f.read(12))) for _ in range(3)])
+                    nrm = numpy.array(struct.unpack("<3f", f.read(12)))
+                    midpoint = list(struct.unpack("<3f", f.read(12)))
+                    radius, = struct.unpack("<f", f.read(4))
+                    # Determine triangle winding order by comparing the calculated normal to the provided one
+                    calc_nrm = numpy.cross(pos[1] - pos[0], pos[2] - pos[0])
+                    calc_nrm = calc_nrm / numpy.linalg.norm(calc_nrm)
+                    wind_order = numpy.dot(calc_nrm, nrm)
+                    vert_buffer.extend(pos.tolist())
+                    if wind_order >= 0:
+                        idx_buffer.append([j*3, j*3+1, j*3+2])
+                    else:
+                        idx_buffer.append([j*3, j*3+2, j*3+1])
+                fmt = {'stride': '12', 'topology': 'trianglelist', 'format': 'DXGI_FORMAT_R32_UINT',\
+                    'elements': [{'id': '0', 'SemanticName': 'POSITION', 'SemanticIndex': '0',\
+                    'Format': 'R32G32B32_FLOAT', 'InputSlot': '0', 'AlignedByteOffset': '0',\
+                    'InputSlotClass': 'per-vertex', 'InstanceDataStepRate': '0'}]}
+                mesh_block_collision_data["collision_mesh"] = {'fmt': fmt,
+                    'ib': idx_buffer, 'vb': [{'Buffer': vert_buffer}]}
+            section2["num_nodes"], = struct.unpack("<I", f.read(4))
+            if section2["num_nodes"] > 0:
+                node_buffer = []
+                for j in range(section2["num_nodes"]):
+                    node = {}
+                    node['min'], node['max'] = [list(struct.unpack("<3f", f.read(12))) for _ in range(2)]
+                    node['start'], node['end'] = struct.unpack("<2i", f.read(8))
+                    node['num_triangles'], = struct.unpack("<I", f.read(4))
+                    if node['num_triangles'] > 0:
+                        node['triangles'] = struct.unpack("<{}I".format(node['num_triangles']), f.read(node['num_triangles']*4))
+                    node_buffer.append(node)
+                mesh_block_collision_data["collision_map"] = node_buffer
+            section2["flags"], = struct.unpack("<I", f.read(4))
             mesh_block["section2"] = section2
             mesh_blocks.append(mesh_block)
             mesh_block_buffers.append(mesh_buffers)
+            mesh_collision_data.append(mesh_block_collision_data)
         mesh_data = {}
         mesh_data["mesh_blocks"] = mesh_blocks
         mesh_data["mesh_buffers"] = mesh_block_buffers
+        mesh_data["mesh_collision_data"] = mesh_collision_data
     if kuro_ver > 1:
         prim.close()
     return(mesh_data)
@@ -516,7 +557,7 @@ def write_fmt_ib_vb (mesh_buffers, filename, node_list = False, complete_maps = 
             f.write(json.dumps(vgmap_json, indent=4).encode("utf-8"))
     return
 
-def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu = False, overwrite = False):
+def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu = False, dump_collision_nodes = False, overwrite = False):
     with open(mdl_file, "rb") as f:
         mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
@@ -559,6 +600,16 @@ def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu
                 write_fmt_ib_vb(mesh_struct["mesh_buffers"][i][j], mdl_file[:-4] +\
                     '/{0}_{1}_{2:02d}'.format(i, safe_filename, j),\
                     node_list = node_list, complete_maps = complete_maps)
+            if "collision_mesh" in mesh_struct["mesh_collision_data"][i]:
+                fmt = mesh_struct["mesh_collision_data"][i]["collision_mesh"]['fmt']
+                write_fmt(fmt, mdl_file[:-4] + '/{0}_{1}_collision.fmt'.format(i, safe_filename))
+                write_ib(mesh_struct["mesh_collision_data"][i]["collision_mesh"]['ib'],
+                    mdl_file[:-4] + '/{0}_{1}_collision.ib'.format(i, safe_filename), fmt)
+                write_vb(mesh_struct["mesh_collision_data"][i]["collision_mesh"]['vb'],
+                    mdl_file[:-4] + '/{0}_{1}_collision.vb'.format(i, safe_filename), fmt)
+            if "collision_map" in mesh_struct["mesh_collision_data"][i] and dump_collision_nodes == True:
+                with open(mdl_file[:-4] + '/{0}_{1}_collision_nodes.json'.format(i, safe_filename), 'wb') as f:
+                    f.write(json.dumps(mesh_struct["mesh_collision_data"][i]["collision_map"], indent=4).encode("utf-8"))
 
 if __name__ == "__main__":
     # Set current directory
@@ -576,6 +627,7 @@ if __name__ == "__main__":
         else:
             parser.add_argument('-c', '--completemaps', help="Provide vgmaps with entire mesh skeleton", action="store_true")
         parser.add_argument('-t', '--trim_for_gpu', help="Trim vertex buffer for GPU injection (3DMigoto)", action="store_true")
+        parser.add_argument('-d', '--dump_collision_nodes', help="Dump collision BVH nodes in JSON format", action="store_true")
         parser.add_argument('-o', '--overwrite', help="Overwrite existing files", action="store_true")
         parser.add_argument('mdl_filename', help="Name of mdl file to export from (required).")
         args = parser.parse_args()
@@ -584,7 +636,8 @@ if __name__ == "__main__":
         else:
             complete_maps = args.completemaps
         if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
-            process_mdl(args.mdl_filename, complete_maps = complete_maps, trim_for_gpu = args.trim_for_gpu, overwrite = args.overwrite)
+            process_mdl(args.mdl_filename, complete_maps = complete_maps, trim_for_gpu = args.trim_for_gpu, 
+            dump_collision_nodes = args.dump_collision_nodes, overwrite = args.overwrite)
     else:
         mdl_files = glob.glob('*.mdl')
         for i in range(len(mdl_files)):
