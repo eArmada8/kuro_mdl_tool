@@ -139,7 +139,9 @@ def dump_meshes (mesh_node, gltf, complete_maps = False):
         vgmap = {gltf.nodes[skin.joints[i]].name:i for i in range(len(skin.joints))}
     submeshes = []
     for i in range(len(mesh.primitives)):
-        if len(mesh.primitives) == 1 and gltf.materials[mesh.primitives[i].material].name == 'collision':
+        if (len(mesh.primitives) == 1
+        and mesh.primitives[i].material is not None
+        and gltf.materials[mesh.primitives[i].material].name == 'collision'):
             submesh = {'name': '{0}_collision'.format(basename)}
         else:
             submesh = {'name': '{0}_{1:02d}'.format(basename, i)}
@@ -356,7 +358,8 @@ def process_gltf (gltf_filename, complete_maps = complete_vgmaps_default, overwr
                 if 'vgmap' in submeshes[i]:
                     with open('{0}/{1}_{2}.vgmap'.format(model_name, mesh_node.mesh, submeshes[i]['name']), 'wb') as f:
                         f.write(json.dumps(submeshes[i]['vgmap'], indent=4).encode("utf-8"))
-                if not model_gltf.materials[model_gltf.meshes[mesh_node.mesh].primitives[i].material].name == 'collision':
+                if (model_gltf.meshes[mesh_node.mesh].primitives[i].material is not None
+                and not model_gltf.materials[model_gltf.meshes[mesh_node.mesh].primitives[i].material].name == 'collision'):
                     mesh_node_metadata['primitives'].append({'id_referenceonly': i,\
                         'material': model_gltf.materials[model_gltf.meshes[mesh_node.mesh].primitives[i].material].name})
             if not mesh_node.skin is None:
