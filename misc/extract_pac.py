@@ -28,7 +28,7 @@ def process_pac (pac_file):
                 f.seek(files[i]['location'])
                 f_data = f.read(files[i]['size'])
                 filedir = os.path.dirname(files[i]['name'])
-                if not os.path.exists(filedir):
+                if not filedir == '' and not os.path.exists(filedir):
                     os.makedirs(filedir)
                 with open(files[i]['name'], 'wb') as f2:
                     f2.write(f_data)
