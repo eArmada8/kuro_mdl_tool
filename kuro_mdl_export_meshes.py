@@ -591,7 +591,7 @@ def process_mdl (mdl_file, complete_maps = complete_vgmaps_default, trim_for_gpu
         with open(skel_json_filename, 'wb') as f:
             f.write(json.dumps(skel_struct, indent=4).encode("utf-8"))
         for i in range(len(mesh_struct["mesh_buffers"])):
-            safe_filename = "".join([x if x not in "\/:*?<>|" else "_" for x in mesh_struct["mesh_blocks"][i]["name"]])
+            safe_filename = "".join([x if x not in "\\/:*?<>|" else "_" for x in mesh_struct["mesh_blocks"][i]["name"]])
             if mesh_struct["mesh_blocks"][i]["node_count"] > 0:
                 node_list = mesh_struct["mesh_blocks"][i]["nodes"]
             else:

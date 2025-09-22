@@ -293,7 +293,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
     for i in range(len(mesh_struct_metadata)):
         mesh_block = bytes()
         meshes = 0 # Keep count of actual meshes imported, in case some have been deleted
-        safe_filename = "".join([x if x not in "\/:*?<>|" else "_" for x in mesh_struct_metadata[i]["name"]])
+        safe_filename = "".join([x if x not in "\\/:*?<>|" else "_" for x in mesh_struct_metadata[i]["name"]])
         if "nodes" in mesh_struct_metadata[i].keys():
             expected_vgmap = {mesh_struct_metadata[i]['nodes'][j]['name']:j for j in range(len(mesh_struct_metadata[i]['nodes']))}
         else:
