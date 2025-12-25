@@ -340,7 +340,15 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
             print("Warning:  The following textures were not found:")
             for texture in missing_textures:
                 print("{}".format(texture))
+    used_node_names = []
+    skel_mesh_indices = [x['mesh_index'] for x in skel_struct]
     for i in range(len(skel_struct)):
+        if skel_struct[i]['name'] in used_node_names:
+            j = 1
+            while "{0}.{1:03d}".format(skel_struct[i]['name'],j) in used_node_names:
+                j += 1
+            skel_struct[i]['name'] = "{0}.{1:03d}".format(skel_struct[i]['name'],j)
+        used_node_names.append(skel_struct[i]['name'])
         node = {'children': skel_struct[i]['children'], 'name': skel_struct[i]['name']}
         if 'pose_matrix' in skel_struct[i]:
             node['matrix'] = skel_struct[i]['pose_matrix']
@@ -520,7 +528,9 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                 primitive["material"] = material_idx
                 primitives.append(primitive)
                 del(submesh)
-            if mesh_struct["mesh_blocks"][i]["name"] in [x['name'] for x in gltf_data['nodes']]:
+            if i in skel_mesh_indices:
+                mesh_node = skel_mesh_indices.index(i)
+            elif mesh_struct["mesh_blocks"][i]["name"] in [x['name'] for x in gltf_data['nodes']]:
                 mesh_node = [j for j in range(len(gltf_data['nodes']))\
                     if gltf_data['nodes'][j]['name'] == mesh_struct["mesh_blocks"][i]["name"]][0]
             elif mesh_struct["mesh_blocks"][i]["name"].split(':')[-1] in [x['name'] for x in gltf_data['nodes']]:
