@@ -31,6 +31,8 @@ def read_value (f):
         data = read_null_terminated_string(f)
     elif dat_type in [0x03, 0x13]:
         data, = struct.unpack("<d", f.read(8))
+        if round(data) == data:
+            data = int(data)
     elif dat_type in [0x04, 0x14]:
         data = {}
         num_entries, = struct.unpack("<I", f.read(4))
