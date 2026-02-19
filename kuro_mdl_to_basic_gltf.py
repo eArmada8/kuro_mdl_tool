@@ -287,6 +287,9 @@ def generate_materials(gltf_data, material_struct):
     for i in range(len(material_struct)):
         material = { 'name': material_struct[i]['material_name'] }
         for j in range(len(material_struct[i]['textures'])):
+            texture_slot = material_struct[i]['textures'][j]['texture_slot']
+            uv_map = texture_slot % 3 if texture_slot < 6 else 0
+            material_switches = [x['material_switch_name'] for x in material_struct[i]['material_switches']]
             if material_struct[i]['textures'][j]['wrapS'] in [0,1,2]:
                 wrapS = {0:10497,1:33648,2:33071}[material_struct[i]['textures'][j]['wrapS']]
             else:
@@ -298,14 +301,17 @@ def generate_materials(gltf_data, material_struct):
             sampler = { 'wrapS': wrapS, 'wrapT': wrapT }
             texture = { 'source': images.index(material_struct[i]['textures'][j]['texture_image_name']), 'sampler': len(gltf_data['samplers']) }
             if material_struct[i]['textures'][j]['texture_slot'] == 0:
-                material['pbrMetallicRoughness']= { 'baseColorTexture' : { 'index' : len(gltf_data['textures']), 'texCoord': material_struct[i]['uv_map_indices'][j] },\
+                material['pbrMetallicRoughness']= { 'baseColorTexture' : { 'index' : len(gltf_data['textures']), 'texCoord': material_struct[i]['uv_map_indices'][uv_map] },\
                     'metallicFactor' : 0.0, 'roughnessFactor' : 1.0 }
-                if material_struct[i]['uv_map_indices'][j] == 0:
-                    material['pbrMetallicRoughness']['baseColorTexture']['extensions'] = khr
+                material['pbrMetallicRoughness']['baseColorTexture']['extensions'] = khr
             elif material_struct[i]['textures'][j]['texture_slot'] == 3:
-                material['normalTexture'] =  { 'index' : len(gltf_data['textures']), 'texCoord': material_struct[i]['uv_map_indices'][j] }
-                if material_struct[i]['uv_map_indices'][j] == 0:
-                    material['normalTexture']['extensions'] = khr
+                material['normalTexture'] =  { 'index' : len(gltf_data['textures']), 'texCoord': material_struct[i]['uv_map_indices'][uv_map] }
+                material['normalTexture']['extensions'] = khr
+            elif material_struct[i]['textures'][j]['texture_slot'] == 7:
+                material['occlusionTexture'] =  { 'index' : len(gltf_data['textures']), 'texCoord': material_struct[i]['uv_map_indices'][uv_map] }
+                material['occlusionTexture']['extensions'] = khr
+            if 'SWITCH_DOUBLESIDE' in material_switches and material_struct[i]['unknown2'][1] == 0:
+                material['doubleSided'] = True
             gltf_data['samplers'].append(sampler)
             gltf_data['textures'].append(texture)
         gltf_data['materials'].append(material)
