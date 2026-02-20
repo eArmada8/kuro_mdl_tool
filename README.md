@@ -8,7 +8,7 @@ Please see the [wiki](https://github.com/eArmada8/kuro_mdl_tool/wiki), and the d
 ## Credits:
 99.9% of my understanding of the MDL format comes from the reverse engineering work of Julian Uy (github.com/uyjulian), and specifically his MDL to GLTF convertor: https://gist.github.com/uyjulian/9a9d6395682dac55d113b503b1172009
 
-The code to decrypt and decompress CLE assets comes from KuroTools (https://github.com/nnguyen259/KuroTools), and I also looked through MDL convertor in KuroTools by TwnKey (github.com/TwnKey) to understand the MDL format.  weskeryiu also provided many insights into the MDL format via in-game experimentation, and helped find numerous bugs in these scripts.
+The code to decrypt and decompress CLE assets comes from KuroTools (https://github.com/nnguyen259/KuroTools), and I also looked through MDL convertor in KuroTools by TwnKey (github.com/TwnKey) to understand the MDL format.  weskeryiu also provided many insights into the MDL format via in-game experimentation, and helped find numerous bugs in these scripts.  lakovic provided insights into several material settings (alpha blend, face culling).
 
 Much of the collision mesh structure in the MDL format was elucidated by Kyuuhachi, who also helped me to figure out the bounding volume hierarchy and how to rebuild the mesh structure.
 
