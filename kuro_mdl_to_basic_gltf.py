@@ -312,6 +312,12 @@ def generate_materials(gltf_data, material_struct):
                 material['occlusionTexture']['extensions'] = khr
             if 'SWITCH_DOUBLESIDE' in material_switches and material_struct[i]['unknown2'][1] == 0:
                 material['doubleSided'] = True
+            if 'SWITCH_ALPHATEST' in material_switches:
+                material['alphaMode'] = 'MASK'
+            elif material_struct[i]['unknown2'][0] == 1:
+                material['alphaMode'] = 'BLEND'
+            else:
+                material['alphaMode'] = 'OPAQUE'
             gltf_data['samplers'].append(sampler)
             gltf_data['textures'].append(texture)
         gltf_data['materials'].append(material)
