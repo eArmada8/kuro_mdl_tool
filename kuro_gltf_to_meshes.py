@@ -134,6 +134,7 @@ def calc_tangents (submesh):
 def dump_meshes (mesh_node, gltf, complete_maps = False):
     basename = mesh_node.name
     mesh = gltf.meshes[mesh_node.mesh]
+    non_duplicated_materials = [x.name for x in gltf.materials if not (x.name[-4] == '.' and x.name[-3:].isdigit())]
     if mesh_node.skin is not None:
         skin = gltf.skins[mesh_node.skin]
         vgmap = {gltf.nodes[skin.joints[i]].name:i for i in range(len(skin.joints))}
@@ -205,7 +206,13 @@ def dump_meshes (mesh_node, gltf, complete_maps = False):
                 submesh['vgmap'] = dict(vgmap)
         submesh['uvmap'] = [{'m_index':i*3, 'm_inputSet':i} for i in range(len([x for x in elements if x['SemanticName']=='TEXCOORD']))]
         if mesh.primitives[i].material is not None:
-            submesh['material'] = gltf.materials[mesh.primitives[i].material].name
+            material_name = gltf.materials[mesh.primitives[i].material].name
+            if material_name[-4] == '.' and material_name[-3:].isdigit() and material_name[:-4] in non_duplicated_materials:
+                raw_input = input("Blender-duplicated material {0} detected!  Use {1} instead? [y/N] ".format(material_name,
+                    material_name[:-4]))
+                if len(raw_input) > 0 and raw_input[0].lower() == 'y':
+                    material_name = material_name[:-4]
+            submesh['material'] = material_name
         else:
             submesh['material'] = 'None'
         submeshes.append(submesh)
@@ -361,7 +368,7 @@ def process_gltf (gltf_filename, complete_maps = complete_vgmaps_default, overwr
                 if (model_gltf.meshes[mesh_node.mesh].primitives[i].material is not None
                 and not model_gltf.materials[model_gltf.meshes[mesh_node.mesh].primitives[i].material].name == 'collision'):
                     mesh_node_metadata['primitives'].append({'id_referenceonly': i,\
-                        'material': model_gltf.materials[model_gltf.meshes[mesh_node.mesh].primitives[i].material].name})
+                        'material': submeshes[i]['material']})
             if not mesh_node.skin is None:
                 ibmtx_raw = read_stream(model_gltf, model_gltf.skins[mesh_node.skin].inverseBindMatrices)
                 bind_mtx = [numpy.linalg.inv(numpy.array([x[0:4],x[4:8],x[8:12],x[12:16]]).transpose()).transpose().tolist() for x in ibmtx_raw]
