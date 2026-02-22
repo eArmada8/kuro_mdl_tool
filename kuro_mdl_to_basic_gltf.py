@@ -540,42 +540,43 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                 primitive["material"] = material_idx
                 primitives.append(primitive)
                 del(submesh)
-            if i in skel_mesh_indices:
-                mesh_node = skel_mesh_indices.index(i)
-            elif mesh_struct["mesh_blocks"][i]["name"] in [x['name'] for x in gltf_data['nodes']]:
-                mesh_node = [j for j in range(len(gltf_data['nodes']))\
-                    if gltf_data['nodes'][j]['name'] == mesh_struct["mesh_blocks"][i]["name"]][0]
-            elif mesh_struct["mesh_blocks"][i]["name"].split(':')[-1] in [x['name'] for x in gltf_data['nodes']]:
-                mesh_node = [j for j in range(len(gltf_data['nodes']))\
-                    if gltf_data['nodes'][j]['name'] == mesh_struct["mesh_blocks"][i]["name"].split(':')[-1]][0]
-            else:
-                gltf_data['nodes'][0]['children'].append(len(gltf_data['nodes']))
-                mesh_node = len(gltf_data['nodes'])
-                gltf_data['nodes'].append({'name': mesh_struct["mesh_blocks"][i]["name"], 'mesh': len(gltf_data['meshes'])})
-            gltf_data['nodes'][mesh_node]['mesh'] = len(gltf_data['meshes'])
-            gltf_data['meshes'].append({"primitives": primitives, "name": mesh_struct["mesh_blocks"][i]["name"]})
-            if has_skeleton:
-                if calc_ibm:
-                    inv_mtx_buffer = bytes()
-                    for k in global_node_dict:
-                        mtx = Quaternion(skel_struct[global_node_dict[k]]['abs_q']).transformation_matrix
-                        [mtx[0,3],mtx[1,3],mtx[2,3]] = skel_struct[global_node_dict[k]]['abs_p']
-                        inv_bind_mtx = numpy.linalg.inv(mtx)
-                        inv_bind_mtx = numpy.ndarray.transpose(inv_bind_mtx)
-                        inv_mtx_buffer += struct.pack("<16f", *[num for row in inv_bind_mtx for num in row])
+            if len(primitives) > 0:
+                if i in skel_mesh_indices:
+                    mesh_node = skel_mesh_indices.index(i)
+                elif mesh_struct["mesh_blocks"][i]["name"] in [x['name'] for x in gltf_data['nodes']]:
+                    mesh_node = [j for j in range(len(gltf_data['nodes']))\
+                        if gltf_data['nodes'][j]['name'] == mesh_struct["mesh_blocks"][i]["name"]][0]
+                elif mesh_struct["mesh_blocks"][i]["name"].split(':')[-1] in [x['name'] for x in gltf_data['nodes']]:
+                    mesh_node = [j for j in range(len(gltf_data['nodes']))\
+                        if gltf_data['nodes'][j]['name'] == mesh_struct["mesh_blocks"][i]["name"].split(':')[-1]][0]
                 else:
-                    inv_mtx_buffer = b''.join([numpy.linalg.inv(numpy.array(x["matrix"],dtype="float32").transpose()).flatten('F').tobytes() for x in mesh_struct["mesh_blocks"][i]["nodes"]])
-                gltf_data['nodes'][mesh_node]['skin'] = len(gltf_data['skins'])
-                gltf_data['skins'].append({"inverseBindMatrices": len(gltf_data['accessors']), "joints": list(global_node_dict.values())})
-                gltf_data['accessors'].append({"bufferView" : len(gltf_data['bufferViews']),\
-                    "componentType": 5126,\
-                    "count": len(mesh_struct["mesh_blocks"][i]["nodes"]),\
-                    "type": "MAT4"})
-                gltf_data['bufferViews'].append({"buffer": 0,\
-                    "byteOffset": len(giant_buffer),\
-                    "byteLength": len(inv_mtx_buffer)})
-                giant_buffer += inv_mtx_buffer
-            gltf_data['scenes'][0]['nodes'].append(mesh_node)
+                    gltf_data['nodes'][0]['children'].append(len(gltf_data['nodes']))
+                    mesh_node = len(gltf_data['nodes'])
+                    gltf_data['nodes'].append({'name': mesh_struct["mesh_blocks"][i]["name"], 'mesh': len(gltf_data['meshes'])})
+                gltf_data['nodes'][mesh_node]['mesh'] = len(gltf_data['meshes'])
+                gltf_data['meshes'].append({"primitives": primitives, "name": mesh_struct["mesh_blocks"][i]["name"]})
+                if has_skeleton:
+                    if calc_ibm:
+                        inv_mtx_buffer = bytes()
+                        for k in global_node_dict:
+                            mtx = Quaternion(skel_struct[global_node_dict[k]]['abs_q']).transformation_matrix
+                            [mtx[0,3],mtx[1,3],mtx[2,3]] = skel_struct[global_node_dict[k]]['abs_p']
+                            inv_bind_mtx = numpy.linalg.inv(mtx)
+                            inv_bind_mtx = numpy.ndarray.transpose(inv_bind_mtx)
+                            inv_mtx_buffer += struct.pack("<16f", *[num for row in inv_bind_mtx for num in row])
+                    else:
+                        inv_mtx_buffer = b''.join([numpy.linalg.inv(numpy.array(x["matrix"],dtype="float32").transpose()).flatten('F').tobytes() for x in mesh_struct["mesh_blocks"][i]["nodes"]])
+                    gltf_data['nodes'][mesh_node]['skin'] = len(gltf_data['skins'])
+                    gltf_data['skins'].append({"inverseBindMatrices": len(gltf_data['accessors']), "joints": list(global_node_dict.values())})
+                    gltf_data['accessors'].append({"bufferView" : len(gltf_data['bufferViews']),\
+                        "componentType": 5126,\
+                        "count": len(mesh_struct["mesh_blocks"][i]["nodes"]),\
+                        "type": "MAT4"})
+                    gltf_data['bufferViews'].append({"buffer": 0,\
+                        "byteOffset": len(giant_buffer),\
+                        "byteLength": len(inv_mtx_buffer)})
+                    giant_buffer += inv_mtx_buffer
+                gltf_data['scenes'][0]['nodes'].append(mesh_node)
             section2_metadata[mesh_struct["mesh_blocks"][i]["name"]] = {
                 'unk0': mesh_struct["mesh_blocks"][i]["section2"]["unk0"],
                 'unk1': mesh_struct["mesh_blocks"][i]["section2"]["unk1"],
