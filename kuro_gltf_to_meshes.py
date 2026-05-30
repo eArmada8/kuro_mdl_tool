@@ -134,7 +134,8 @@ def calc_tangents (submesh):
 def dump_meshes (mesh_node, gltf, complete_maps = False):
     basename = mesh_node.name
     mesh = gltf.meshes[mesh_node.mesh]
-    non_duplicated_materials = [x.name for x in gltf.materials if not (x.name[-4] == '.' and x.name[-3:].isdigit())]
+    non_duplicated_materials = [x.name for x in gltf.materials
+        if (len(x.name) > 4 and not (x.name[-4] == '.' and x.name[-3:].isdigit()))]
     if mesh_node.skin is not None:
         skin = gltf.skins[mesh_node.skin]
         vgmap = {gltf.nodes[skin.joints[i]].name:i for i in range(len(skin.joints))}
@@ -207,7 +208,8 @@ def dump_meshes (mesh_node, gltf, complete_maps = False):
         submesh['uvmap'] = [{'m_index':i*3, 'm_inputSet':i} for i in range(len([x for x in elements if x['SemanticName']=='TEXCOORD']))]
         if mesh.primitives[i].material is not None:
             material_name = gltf.materials[mesh.primitives[i].material].name
-            if material_name[-4] == '.' and material_name[-3:].isdigit() and material_name[:-4] in non_duplicated_materials:
+            if (len(material_name) > 4 and
+                (material_name[-4] == '.' and material_name[-3:].isdigit() and material_name[:-4] in non_duplicated_materials)):
                 raw_input = input("Blender-duplicated material {0} detected!  Use {1} instead? [y/N] ".format(material_name,
                     material_name[:-4]))
                 if len(raw_input) > 0 and raw_input[0].lower() == 'y':
