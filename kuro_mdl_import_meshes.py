@@ -85,7 +85,7 @@ def build_skeleton_struct_from_mdl (mdl_filename):
         skel_struct = obtain_skeleton_data(mdl_data)
     return(skel_struct)
 
-def build_skeleton_section (skel_struct):
+def build_skeleton_section (skel_struct, kuro_ver = 1):
     output_buffer = struct.pack("<I", len(skel_struct))
     for i in range(len(skel_struct)):
         output_buffer += make_pascal_string(skel_struct[i]['name'])
@@ -96,6 +96,8 @@ def build_skeleton_section (skel_struct):
         output_buffer += struct.pack("<3f", *skel_struct[i]['rotation_euler_rpy'])
         output_buffer += struct.pack("<3f", *skel_struct[i]['scale'])
         output_buffer += struct.pack("<3f", *skel_struct[i]['unknown'])
+        if kuro_ver > 4:
+            output_buffer += struct.pack("<I", skel_struct[i]['unknown2'])
         output_buffer += struct.pack("<I", len(skel_struct[i]['children']))
         output_buffer += struct.pack("<{}I".format(len(skel_struct[i]['children'])), *skel_struct[i]['children'])
     return(struct.pack("<2I", 2, len(output_buffer)) + output_buffer)
@@ -570,7 +572,7 @@ def process_mdl (mdl_file, change_compression = False, force_kuro_version = Fals
     # Command line option overrides JSON file
     if force_kuro_version != False and force_kuro_version < kuro_ver:
         kuro_ver = force_kuro_version
-    skeleton_data = build_skeleton_section(build_skeleton_struct_from_mdl(mdl_file[:-4]))
+    skeleton_data = build_skeleton_section(build_skeleton_struct_from_mdl(mdl_file[:-4]), kuro_ver = kuro_ver)
     mesh_data, primitive_data, material_list = build_mesh_section(mdl_file[:-4], kuro_ver = kuro_ver)
     material_data = build_material_section(mdl_file[:-4], material_list, kuro_ver)
     new_mdl_data = insert_model_data(mdl_data, skeleton_data, material_data, mesh_data, primitive_data, kuro_ver)
