@@ -320,6 +320,9 @@ def generate_materials(gltf_data, material_struct):
                 material['alphaMode'] = 'OPAQUE'
             gltf_data['samplers'].append(sampler)
             gltf_data['textures'].append(texture)
+        if len(material_struct[i]['textures']) == 0: # Hide invisible meshes (e.g. shadow meshes)
+            material['alphaMode'] = 'MASK'
+            material['alphaCutoff'] = 1.0
         gltf_data['materials'].append(material)
     return(gltf_data)
 
@@ -483,7 +486,8 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
                     material_idx = [x['name'] for x in gltf_data['materials']].index('collision')
                 else:
                     material_idx = len(gltf_data['materials'])
-                    gltf_data['materials'].append({'name': 'collision'})
+                    gltf_data['materials'].append({'name': 'collision',
+                        'alphaMode': 'MASK', 'alphaCutoff': 1.0})
                 print("Processing {0} collision mesh...".format(mesh_struct["mesh_blocks"][i]["name"]))
                 submesh = mesh_struct["mesh_collision_data"][i]["collision_mesh"]
                 gltf_fmt = convert_fmt_for_gltf(submesh['fmt'])
