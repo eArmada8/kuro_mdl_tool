@@ -223,3 +223,19 @@ This script will first ask you for the game you are targeting, then it will take
 This script will take the hash output from kuro_mdl_export_meshes.py and attempt to find different available shaders.  It will list shaders in order of increasing differences in the switches.  The script will write a text file in the same directory.  kuro_shaders.csv is required for the search.
 
 The script will ask if you want to restrict output to shaders available in a specific game (e.g. Kuro 1, Kuro 2) - if a restriction is set then each shader listed will have a model file in which you can find the shader utilized.
+
+### lz4_compress.py
+This script will compress and encrypt files with lz4 so they can be used in Trail in the Sky 2nd Chapter.  If double-clicked, it will compress and encrypt all files it finds in the current directory, assuming they are not .py, .uncompressed_original, or already compressed.  It will make a backup copy of the original with .uncompressed_original extension appended to the name.  This is only necessary for textures, to my knowledge.
+
+**Command line arguments:**
+`lz4_compress.py [-h] filename`
+
+No command line options, but you can compress single files using the command line.
+
+### lz4_decompress.py
+This script will decrypt and/or decompress files using the Blowfish key that is used in Trail in the Sky 2nd Chapter.  If double-clicked, it will decrypt and decompress all files it finds in the current directory, assuming they are not .compressed_original files.  It will make a backup copy of the original with .compressed_original extension appended to the name.
+
+**Command line arguments:**
+`lz4_decompress.py [-h] cle_asset_filename`
+
+No command line options, but you can decrypt / decompress single files using the command line.
