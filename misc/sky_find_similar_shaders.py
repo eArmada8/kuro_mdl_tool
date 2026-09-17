@@ -10,7 +10,7 @@
 import os, csv
 
 csv_file = 'sky_shaders.csv'
-num_games = 1 # SKY1
+num_games = 2 # SKY1, SKY2
 
 class Shader_db:
     def __init__(self, shader_db_csv, report_file = 'report.txt'):
