@@ -10,14 +10,15 @@
 import os, csv
 
 csv_file = 'ys_x_shaders.csv'
+num_games = 2 # Ys X Nordics, Ys X Proud Nordics
 
 class Shader_db:
     def __init__(self, shader_db_csv, report_file = 'report.txt'):
         self.shader_db_csv = shader_db_csv
         self.report_file = report_file
         self.shader_array = self.read_shader_csv()
-        self.shader_switches = self.shader_array[0][3:]
-        self.shader_sig = {x[0]:x[3:] for x in self.shader_array[1:]}
+        self.shader_switches = self.shader_array[0][num_games+1:]
+        self.shader_sig = {x[0]:x[num_games+1:] for x in self.shader_array[1:]}
         self.diffs = {}
         self.restriction = ''
         self.restriction_column = None
@@ -30,7 +31,7 @@ class Shader_db:
             return([row for row in csv_reader])
 
     def set_restricted_list (self, restriction):
-        if restriction in self.shader_array[0][1:3]:
+        if restriction in self.shader_array[0][1:num_games+1]:
             self.restriction = restriction
             self.restriction_column = self.shader_array[0].index(restriction)
             self.restricted_list = [x[0] for x in self.shader_array[1:] if x[self.restriction_column] != '']
@@ -97,9 +98,9 @@ if __name__ == "__main__":
                     shader = input("Please enter name of shader to analyze: ")
             else:
                 shader = input("Invalid entry. Please enter name of shader to analyze: ")
-        restriction = input("Please enter game restriction [{}, or blank for None]: ".format(', '.join(shader_db.shader_array[0][1:3])))
-        while not restriction in ['']+shader_db.shader_array[0][1:3]:
-            restriction = input("Invalid entry. Please enter game restriction [{}, or blank for None]: ".format(', '.join(shader_db.shader_array[0][1:3])))
+        restriction = input("Please enter game restriction [{}, or blank for None]: ".format(', '.join(shader_db.shader_array[0][1:num_games+1])))
+        while not restriction in ['']+shader_db.shader_array[0][1:num_games+1]:
+            restriction = input("Invalid entry. Please enter game restriction [{}, or blank for None]: ".format(', '.join(shader_db.shader_array[0][1:num_games+1])))
         restrict_type = True
         restrict_type_raw = input("Restrict matches to {}? [Y/n]: ".format(shader.split("#")[0]))
         if len(restrict_type_raw) > 0 and (str(restrict_type_raw).lower()[0]) == 'n':
