@@ -102,19 +102,11 @@ def build_animation_section (ani_struct):
     output_buffer += struct.pack("<2f", min(timestamps), max(timestamps))
     return(struct.pack("<2I", 3, len(output_buffer)) + output_buffer)
 
-def insert_animation_data (mdl_data, skeleton_section_data, animation_section_data):
+def insert_animation_data (mdl_data, skeleton_section_data, animation_section_data, kuro_ver):
     with io.BytesIO(mdl_data) as f:
-        new_mdl_data = f.read(4) #Header
-        orig_kuro_ver, = struct.unpack("<I", f.read(4))
-        if orig_kuro_ver > 1:
-            if sorted(mdl_contents(mdl_data)) == [2,3]:
-                orig_kuro_ver = 1 #Silently downgrade to MDL version 1, as CLE Kuro 2 / Kai does not support v2/4 animations
-            else:
-                print("Warning!  v2+ MDL detected and auto-downgrade not possible.  This MDL will crash the game.")
-                print("If using with CLE Kuro 2 / Kai, please downgrade MDL prior to animation import.")
-                input("Press Enter to continue.")
-        new_mdl_data += struct.pack("<I", orig_kuro_ver)
-        new_mdl_data += f.read(4) #Not sure what this is in the header
+        new_mdl_data = bytearray()
+        section_4_offset = 0 # This is 0 in MDL v1, and either the start of section 4 or the tail u32 if no section 4
+        f.seek(12) # Skip the header, we will replace it
         while True:
             current_offset = f.tell()
             section = f.read(8)
@@ -128,11 +120,16 @@ def insert_animation_data (mdl_data, skeleton_section_data, animation_section_da
                 section = skeleton_section_data
             if section_info["type"] == 3: # Animation section to replace
                 section = animation_section_data
-            new_mdl_data += section
-        # Catch the null bytes at the end of the stream
-        f.seek(current_offset,0)
-        new_mdl_data += f.read()
-        return(new_mdl_data)
+            if section_info["type"] == 4: # Primitive section to replace
+                if kuro_ver > 1:
+                    section_4_offset = len(new_mdl_data)
+            new_mdl_data.extend(section)
+        # Add the null bytes at the end of the MDL file
+        if kuro_ver > 1 and section_4_offset == 0:
+            section_4_offset = len(new_mdl_data) # If there is no section 4 in MDL v2+, point to the null bytes
+        new_mdl_data.extend(struct.pack("<i", -1))
+        header = b'MDL ' + struct.pack("<2I", kuro_ver, section_4_offset)
+        return(bytearray(header + new_mdl_data))
 
 def get_gltf_name (animation):
     if os.path.exists(animation+'.glb'):
@@ -153,6 +150,7 @@ def process_mdl (mdl_file, change_compression = False, use_json_data = False):
         mdl_data = decryptCLE(mdl_data)
     else:
         compressed = False
+    kuro_ver = get_kuro_ver(mdl_data)
     if 3 not in mdl_contents(mdl_data):
         print("Skipping {0} as it does not contain an animation.".format(mdl_file))
         return False
@@ -183,7 +181,7 @@ def process_mdl (mdl_file, change_compression = False, use_json_data = False):
         ani_struct = extract_animation(gltf)
     skeleton_data = build_skeleton_section(skel_struct)
     ani_data = build_animation_section(ani_struct)
-    new_mdl_data = insert_animation_data(mdl_data, skeleton_data, ani_data)
+    new_mdl_data = insert_animation_data(mdl_data, skeleton_data, ani_data, kuro_ver)
     # Instead of overwriting backups, it will just tag a number onto the end
     backup_suffix = ''
     if os.path.exists(mdl_file + '.bak' + backup_suffix):

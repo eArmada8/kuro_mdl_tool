@@ -42,11 +42,9 @@ def make_pascal_string(string):
 # force_kuro_version should be either set to False, or to an integer.
 def insert_model_data (mdl_data, skeleton_section_data, material_section_data, mesh_section_data, primitive_section_data, kuro_ver):
     with io.BytesIO(mdl_data) as f:
-        new_mdl_data = f.read(4) #Header
-        orig_kuro_ver, = struct.unpack("<I", f.read(4))
-        kuro_ver = min(kuro_ver, orig_kuro_ver)
-        new_mdl_data += struct.pack("<I", kuro_ver)
-        new_mdl_data += f.read(4) #Not sure what this is in the header
+        new_mdl_data = bytearray()
+        section_4_offset = 0 # This is 0 in MDL v1, and either the start of section 4 or the tail u32 if no section 4
+        f.seek(12) # Skip the header, we will replace it
         while True:
             current_offset = f.tell()
             section = f.read(8)
@@ -65,13 +63,16 @@ def insert_model_data (mdl_data, skeleton_section_data, material_section_data, m
             if section_info["type"] == 4: # Primitive section to replace
                 if kuro_ver > 1:
                     section = primitive_section_data
+                    section_4_offset = len(new_mdl_data)
                 else: # Needed if we are forcing downgrade to version 1
                     section = b''
-            new_mdl_data += section
-        # Catch the null bytes at the end of the stream
-        f.seek(current_offset,0)
-        new_mdl_data += f.read()
-        return(new_mdl_data)
+            new_mdl_data.extend(section)
+        # Add the null bytes at the end of the MDL file
+        if kuro_ver > 1 and section_4_offset == 0:
+            section_4_offset = len(new_mdl_data) # If there is no section 4 in MDL v2+, point to the null bytes
+        new_mdl_data.extend(struct.pack("<i", -1))
+        header = b'MDL ' + struct.pack("<2I", kuro_ver, section_4_offset)
+        return(bytearray(header + new_mdl_data))
 
 def build_skeleton_struct_from_mdl (mdl_filename):
     # Will read data from JSON file, or load original data from the mdl file if JSON is missing
@@ -275,7 +276,6 @@ def triangle_struct_to_bvh_node_list (triangle_struct):
 
 def build_mesh_section (mdl_filename, kuro_ver = 1):
     # Ordinarily we do not need to parse the original file, but in case we do, we only want to do it once
-    has_parsed_original_file = False
     try:
         mesh_struct_metadata = read_struct_from_json(mdl_filename + "/mesh_info.json")
     except:
@@ -284,7 +284,6 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
             mdl_data = f.read()
         mdl_data = decryptCLE(mdl_data)
         mesh_struct = obtain_mesh_data(mdl_data, obtain_material_data(mdl_data))
-        has_parsed_original_file = True
         mesh_struct_metadata = mesh_struct["mesh_blocks"]
     output_buffer = struct.pack("<I", len(mesh_struct_metadata))
     material_list = []
@@ -309,21 +308,8 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                 ib = list(chain.from_iterable(read_ib(mesh_filename + '.ib', fmt)))
                 vb = read_vb(mesh_filename + '.vb', fmt)
             except FileNotFoundError:
-                if kuro_ver > 1:
-                    print("Submesh {0} not found, generating an empty submesh...".format(mesh_filename))
-                    if has_parsed_original_file == False:
-                        with open(mdl_filename + '.mdl', "rb") as f:
-                            mdl_data = f.read()
-                        mdl_data = decryptCLE(mdl_data)
-                        mesh_struct = obtain_mesh_data(mdl_data, obtain_material_data(mdl_data))
-                        has_parsed_original_file = True
-                    # Generate an empty submesh
-                    fmt = make_fmt_struct(mesh_struct["mesh_buffers"][i][j])
-                    ib = []
-                    vb = mesh_struct["mesh_buffers"][i][j]['vb']
-                else:
-                    print("Submesh {0} not found, skipping...".format(mesh_filename))
-                    continue
+                print("Submesh {0} not found, skipping...".format(mesh_filename))
+                continue
             print("Processing submesh {0}...".format(mesh_filename))
             # VGMap sanity check - Make sure the .vgmap file matches the actual skin node tree
             try:
@@ -459,7 +445,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                 if kuro_ver == 1:
                     primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
                 elif kuro_ver > 1:
-                    prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, j)
+                    prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, meshes)
                     prim_output_data += raw_buffer
                     prim_buffer_count += 1
                 # Minimum 3 texcoord, required by Kuro 1 (&2?)
@@ -468,7 +454,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
                         if kuro_ver == 1:
                             primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
                         elif kuro_ver > 1:
-                            prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, j)
+                            prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, meshes)
                             prim_output_data += raw_buffer
                             prim_buffer_count += 1
             # After VB, need to add IB
@@ -478,7 +464,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
             if kuro_ver == 1:
                 primitive_buffer += struct.pack("<3I", 7, len(raw_ibuffer), vec_stride) + raw_ibuffer
             elif kuro_ver > 1:
-                prim_output_header += struct.pack("<5I", 7, len(raw_ibuffer), vec_stride, i, j)
+                prim_output_header += struct.pack("<5I", 7, len(raw_ibuffer), vec_stride, i, meshes)
                 prim_output_data += raw_ibuffer
                 prim_buffer_count += 1
             mesh_block += primitive_buffer
@@ -602,7 +588,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         import argparse
         parser = argparse.ArgumentParser()
-        parser.add_argument('-f', '--force_version', help="Force compile at a specific Kuro version (must be equal to or lower than original)", type=int, choices=range(1,3))
+        parser.add_argument('-f', '--force_version', help="Force compile at a specific Kuro version (must be equal to or lower than original)", type=int, choices=range(1,6))
         parser.add_argument('-c', '--change_compression', help="Change compression (compressed to uncompressed or vice versa)", action="store_true")
         parser.add_argument('mdl_filename', help="Name of mdl file to import into (required).")
         args = parser.parse_args()

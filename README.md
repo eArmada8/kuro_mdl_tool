@@ -16,12 +16,20 @@ None of this would be possible without the work of DarkStarSword and his amazing
 
 I am very thankful for uyjulian, TwnKey, weskeryiu, Kyuuhachi, DarkStarSword, the KuroTools team and the Kiseki modding discord for their brilliant work and for sharing that work so freely.
 
+## AI Disclosure
+
+There is one function (to calculate a circumsphere) written by AI (ChatGPT).  I used AI (Claude, attached to ghidra) to help me find a few persistent errors, but I wrote the code to fix those errors.
+
 ## Requirements:
 1. Python 3.10 and newer is required for use of these scripts.  It is free from the Microsoft Store, for Windows users.  For Linux users, please consult your distro.
-2. The blowfish, zstandard, numpy, pyquaternion and xxhash modules for python are needed.  Install by typing "python3 -m pip install blowfish zstandard numpy pyquaternion xxhash" in the command line / shell.  (The io, re, struct, sys, os, shutil, glob, base64, json, operator, argparse and itertools modules are also required, but these are all already included in most basic python installations.)
+2. The blowfish, zstandard, numpy, pyquaternion and xxhash modules for python are needed.  Install by typing "python3 -m pip install blowfish zstandard numpy pyquaternion xxhash lz4" in the command line / shell.  (The io, re, struct, sys, os, shutil, glob, base64, json, operator, argparse and itertools modules are also required, but these are all already included in most basic python installations.)
 3. The output can be imported into Blender using DarkStarSword's amazing plugin: https://github.com/DarkStarSword/3d-fixes/blob/master/blender_3dmigoto.py (tested on commit [5fd206c](https://raw.githubusercontent.com/DarkStarSword/3d-fixes/5fd206c52fb8c510727d1d3e4caeb95dac807fb2/blender_3dmigoto.py))
-4. kuro_mdl_export_meshes.py is dependent on lib_fmtibvb.py, which must be in the same folder.  
-kuro_mdl_import_meshes.py is dependent on both kuro_mdl_export_meshes.py and lib_fmtibvb.py.
+4. Internal dependencies:
+  - kuro_mdl_export_meshes.py is dependent on lib_fmtibvb.py, which must be in the same folder.
+  - kuro_mdl_import_meshes.py is dependent on both kuro_mdl_export_meshes.py and lib_fmtibvb.py.
+  - kuro_mdl_to_basic_gltf.py is dependent on both kuro_mdl_export_meshes.py and lib_fmtibvb.py.
+  - kuro_gltf_to_meshes.py is dependent on lib_fmtibvb.py.
+  - kuro_mdl_import_animation.py is dependent on kuro_gltf_to_meshes.py and kuro_mdl_import_meshes.py (which is dependent on both kuro_mdl_export_meshes.py and lib_fmtibvb.py).
 
 ## Usage:
 ### kuro_mdl_export_meshes.py
@@ -67,8 +75,8 @@ Shows help message.
 `-c, --change_compression`
 By default, the import script will detect if the current (pre-import) mdl file has CLE zstandard compression applied, and will compress the new file only if the current file is compressed.  Using this option will force the script to change the compression (*e.g.* it will change the output from compressed to non-compressed, or from non-compressed to compressed).
 
-`-f {1,2}, --force_version {1,2}`
-This option will tell the importer to force compile the MDL at a specific Kuro version.  At this time, it only supports downgrading Kuro 2 MDLs to Kuro 1.  Hopefully in the future we will know enough about the new version to allow upgrading as well.  Of note, when missing / invalid submeshes are detected, K1 behavior is to completely remove the entry from the MDL (needed for NISA Kuro 1), and K2 behavior is to insert a dummy (invisible) submesh (needed for CLE Kuro 2).
+`-f {1,2}, --force_version {1,2,3,4,5}`
+This option will tell the importer to force compile the MDL at a specific Kuro version.  At this time, this tool only allows downgrading versions (e.g. 2 to 1, but not 1 to 2).
 
 **Adding and deleting meshes**
 
@@ -90,16 +98,15 @@ Go to material_info.json, and go that section.  For example, if "material" in me
 
 *Notes:*
 - All the changes should be in material_info.json.  There is no material data worth changing in mesh_info.json other than material assignments.
-- When making mods with new textures, I highly recommend giving them unique names, instead of asking the user to overwrite textures that already exist.  That way, you do not have to worry about when two or more models use the same textures.  You should be able to add new texture slots or delete old ones as well (for example adding normal or gradient maps to meshes that did not have them before), just carefully copy from other meshes.  *CLE Kuro 2 / Kai requires that the new textures have the same filename length as the original textures when using MDL v2/v4; downgrading to v1 gets around this restriction.*
-- The textures that come with the CLE release of Kuro 1 and 2 are compressed.  Use cle_decrypt_decompress.py.  Kuro 1 will read uncompressed dds files; Kuro 2 will crash with uncompressed dds files.  Use cle_compress.py to compress the texture files before use.
+- When making mods with new textures, I highly recommend giving them unique names, instead of asking the user to overwrite textures that already exist.  That way, you do not have to worry about when two or more models use the same textures.  You should be able to add new texture slots or delete old ones as well (for example adding normal or gradient maps to meshes that did not have them before), just carefully copy from other meshes.
+- The textures that come with the CLE release of Kuro 1 and 2 are compressed.  Use cle_decrypt_decompress.py.  Kuro 1 CLE will read uncompressed dds files; Kuro 2 CLE will crash with uncompressed dds files.  Use cle_compress.py to compress the texture files before use.
 
 **Changing shaders**
 
 Please see the instructions above for changing textures.  We cannot create novel configurations of shaders, because they are already compiled in pre-determined configurations.  To create a new material, you must base it off of a valid configuration.  Copy the entire section from the model you want, and give it a unique "material_name".  *Do not change anything in "shader_name", "str3", or "material_switches" - if you need different switches then find an existing material with the switches that you need.*  Update the textures section as above to point to your textures.  The values for the "parameters" section can be changed, but you cannot add or remove the parameters themselves.  (For example, if your material has "rimLightColor_g" set to [0.627, 0.558, 0.504], you can change that value.  But if the material does not have "rimLightColor_g" at all, you cannot at it.  Nor can you remove the parameter entirely if you do not want rim lighting, for example.  Also, I do not believe you can change values for parameters that start with "Switch_".)
 
 *Notes:*
-- All the changes should be in material_info.json.  There is nothing worth changing in mesh_info.json.
-- Changing shaders in CLE 2 Kuro / Kai (MDL v2/v4) results in crashes.  Downgrade to MDL v1 to work around this.
+- All the changes should be in material_info.json.  mesh_info.json only contains material assignments; there is no.
 
 **Changing the skeleton**
 
@@ -153,8 +160,6 @@ Note that both kuro_mdl_import_meshes.py and kuro_mdl_import_animation.py will o
 
 It will make a backup of the original, then overwrite the original.  It will not overwrite backups; for example if "model.mdl.bak" already exists, then it will write the backup to "model.mdl.bak1", then to "model.mdl.bak2", and so on.
 
-*Note: Animations in MDL version 2 format are auto-downgraded to version 1, as v2 custom animations in CLE Kuro 2 are not able to pass the startup check and result in the infamous endless load screen.  This script can only auto-downgrade pure animations, not model+animation mdls.  For the latter, use kuro_mdl_export_meshes.py / kuro_mdl_import_meshes.py and manually downgrade the .mdl before importing the animation.*
-
 **Command line arguments:**
 `kuro_mdl_import_animation.py [-h] [-c] mdl_filename`
 
@@ -199,6 +204,8 @@ This will also change the command line argument `-p, --partialmaps` into `-c, --
 - Collision meshes are exported as a mesh with the position semantic only, and only the position semantic (and faces of course) is used when importing - all other semantics (e.g. normal, tangent, uv) will be ignored if you have added them to the raw buffers.
 - When using raw buffers (.fmt/.ib/.vb) to edit collision meshes in Blender, the plugin will give an error on export because it will attempt to calculate a tangent vector using non-existant UV coordinates.  Just add a blank UV map in Blender before export; it will then allow proper export.  The blank UV map will not be exported.
 - When using kuro_mdl_to_basic_gltf.py to export to glTF, an empty material called `collision` will be assigned to all collision meshes, to mark them as collision meshes.  When dumping meshes to raw buffers for building an MDL, kuro_gltf_to_meshes.py will use the `collision` material to know which meshes to convert from visible to collision, assuming there is no more than one submesh in the mesh.  Collision flags are stored in the .metadata file generated by kuro_mdl_to_basic_gltf.py; if they are not present then kuro_gltf_to_meshes.py will guess based on the first two letters of the node name.
+
+## Miscellaneous tools
 
 ### cle_compress.py
 This script will compress and encrypt files with zstandard so they can be used in Kuro no Kiseki 2 (CLE release).  If double-clicked, it will compress and encrypt all files it finds in the current directory, assuming they are not .py, .bak, or already compressed.  This is not necessary with output from the importer since the files are already compressed, but would be needed for textures, etc.  MDL and DDS files will be compressed only, as the game does not expect them to be not encrypted.
