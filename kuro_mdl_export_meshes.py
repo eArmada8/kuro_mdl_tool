@@ -495,9 +495,9 @@ def obtain_material_data (mdl_data):
                     case 0 | 1:
                         shader_block['data'], = struct.unpack("<I",f.read(4))
                     case 2:
-                        shader_block['data_base64'] = base64.b64encode(f.read(8)).decode()
+                        shader_block['data'], = struct.unpack("<2I",f.read(8))
                     case 3:
-                        shader_block['data_base64'] = base64.b64encode(f.read(12)).decode()
+                        shader_block['data'], = struct.unpack("<3I",f.read(12))
                     case 4:
                         shader_block['data'], = struct.unpack("<f",f.read(4))
                     case 5:
@@ -505,9 +505,9 @@ def obtain_material_data (mdl_data):
                     case 6:
                         shader_block['data'] = list(struct.unpack("<3f",f.read(12)))
                     case 7:
-                        shader_block['data_base64'] = base64.b64encode(f.read(16)).decode()
+                        shader_block['data'] = list(struct.unpack("<4f",f.read(16)))
                     case 8:
-                        shader_block['data_base64'] = base64.b64encode(f.read(64)).decode()
+                        shader_block['data'] = list(struct.unpack("<16f",f.read(64)))
                     case 0xFFFFFFFF:
                         shader_block['data_base64'] = ''
                 material_block['shaders'].append(shader_block)

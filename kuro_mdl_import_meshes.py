@@ -142,15 +142,16 @@ def build_material_section (mdl_filename, material_list = [], kuro_ver = 1):
         shader_elements = bytes()
         shader_element_count = 0
         for j in range(len(material_struct[i]['shaders'])):
-            if material_struct[i]['shaders'][j]['type_int'] in [0,1,4,5,6]: # These are decoded, so need to be encoded
-                struct_dict = {0: "<I", 1: "<I", 4: "<f", 5: "<2f", 6: "<3f"}
+            if (material_struct[i]['shaders'][j]['type_int'] in [0,1,2,3,4,5,6,7,8]
+                    and 'data' in material_struct[i]['shaders'][j]): # These are decoded, so need to be encoded
+                struct_dict = {0: "<I", 1: "<I", 2: "<2I", 3: "<3I", 4: "<f", 5: "<2f", 6: "<3f", 7: "<4f", 8: "<16f"}
                 shader_elements += make_pascal_string(material_struct[i]['shaders'][j]['shader_name']) \
                     + struct.pack("<I", material_struct[i]['shaders'][j]['type_int'])
                 if type(material_struct[i]['shaders'][j]['data']) == list:
                     shader_elements += struct.pack(struct_dict[material_struct[i]['shaders'][j]['type_int']], *material_struct[i]['shaders'][j]['data'])
                 else:
                     shader_elements += struct.pack(struct_dict[material_struct[i]['shaders'][j]['type_int']], material_struct[i]['shaders'][j]['data'])
-            else:
+            else: # Legacy data format
                 shader_elements += make_pascal_string(material_struct[i]['shaders'][j]['shader_name']) \
                     + struct.pack("<I", material_struct[i]['shaders'][j]['type_int']) \
                     + base64.b64decode(material_struct[i]['shaders'][j]['data_base64'])
