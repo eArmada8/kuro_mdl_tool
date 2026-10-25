@@ -460,7 +460,8 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
             # After VB, need to add IB
             # Making assumptions here that it will always be in Rxx_UINT format, saves a bunch of code
             vec_stride = int(int(re.findall("[0-9]+",fmt["format"].split('DXGI_FORMAT_')[-1].split('_')[0])[0]) / 8)
-            raw_ibuffer = struct.pack("<{0}I".format(len(ib), element_type), *ib)
+            element_type = 'H' if vec_stride == 2 else 'I'
+            raw_ibuffer = struct.pack("<{}{}".format(len(ib), element_type), *ib)
             if kuro_ver == 1:
                 primitive_buffer += struct.pack("<3I", 7, len(raw_ibuffer), vec_stride) + raw_ibuffer
             elif kuro_ver > 1:

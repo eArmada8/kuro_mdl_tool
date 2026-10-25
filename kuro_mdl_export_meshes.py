@@ -276,7 +276,7 @@ def obtain_mesh_data (mdl_data, material_struct, trim_for_gpu = False):
                             element_type = 'I'
                         case 7:
                             element["Semantic"] = "TRIANGLES"
-                            element_type = 'I'
+                            element_type = 'H' if element["stride"] == 2 else 'I'
                     element_index = semantic_index[element["type_int"]]
                     semantic_index[element["type_int"]] += 1
                     buffer = {}
