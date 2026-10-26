@@ -224,7 +224,7 @@ def obtain_mesh_data (mdl_data, material_struct, trim_for_gpu = False):
                     primitive["num_of_elements"], = struct.unpack("<I",f.read(4))
                 elif kuro_ver > 1:
                     primitive["num_of_elements"] = len([x for x in primitive_info if x['mesh'] == i and x['submesh'] == j])
-                    primitive["triangle_count"], primitive["unk"] = struct.unpack("<2I",f.read(8))
+                    primitive["index_count"], primitive["primitive_flags"] = struct.unpack("<2I",f.read(8))
                 elements = []
                 ibvb = {}
                 buffers = []

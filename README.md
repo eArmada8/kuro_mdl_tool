@@ -62,7 +62,7 @@ which you can change to
 This will also change the command line argument `-p, --partialmaps` into `-c, --completemaps` which you would call to enable complete vgmaps instead.
 
 ### kuro_mdl_import_meshes.py
-Double click the python script and it will search the current folder for all .mdl files with exported folders, and import the meshes in the folder back into the mdl file.  Additionally, it will parse the 4 JSON files (mesh metadata, materials, skeleton and MDL version) if available and use that information to rebuild the mesh, materials and skeleton sections.  This script requires a working mdl file already be present as it does not reconstruct the entire file; only the known relevant sections.  The remaining parts of the file (any animation data, etc) are copied unaltered from the intact mdl file.  By default, it will apply zstandard compression to the final file if the original file is compressed.
+Double click the python script and it will search the current folder for all .mdl files with exported folders, and import the meshes in the folder back into the mdl file.  Additionally, it will parse the 4 JSON files (mesh metadata, materials, skeleton and MDL version) if available and use that information to rebuild the mesh, materials and skeleton sections.  This script requires a working mdl file already be present as it does not reconstruct the entire file; only the known relevant sections.  The remaining parts of the file (any animation data, etc) are copied unaltered from the intact mdl file.  By default, it will apply CLE zstandard compression to the final file if the original file is compressed.
 
 It will make a backup of the original, then overwrite the original.  It will not overwrite backups; for example if "model.mdl.bak" already exists, then it will write the backup to "model.mdl.bak1", then to "model.mdl.bak2", and so on.
 
@@ -76,7 +76,7 @@ Shows help message.
 By default, the import script will detect if the current (pre-import) mdl file has CLE zstandard compression applied, and will compress the new file only if the current file is compressed.  Using this option will force the script to change the compression (*e.g.* it will change the output from compressed to non-compressed, or from non-compressed to compressed).
 
 `-f {1,2}, --force_version {1,2,3,4,5}`
-This option will tell the importer to force compile the MDL at a specific Kuro version.  At this time, this tool only allows downgrading versions (e.g. 2 to 1, but not 1 to 2).
+This option will tell the importer to force compile the MDL at a specific Kuro version.  *Note:* It is recommended to only downgrade (e.g. v4 -> v2 -> v1) and not upgrade (v1 -> v2 -> v4), although the latter is supported.  However, some models have garbage data in unused semantics (e.g. COLOR in chr5001_c03.mdl) that will crash the importer when it attempts to convert the data.
 
 **Adding and deleting meshes**
 
