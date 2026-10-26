@@ -168,7 +168,7 @@ def build_material_section (mdl_filename, material_list = [], kuro_ver = 1):
             material_switch_count += 1
         material_block += struct.pack("<I", material_switch_count) + material_switches
         # Convert legacy metadata format
-        misc_flags_param_names = ['alpha_blend_mode', 'face_cull_mode', 'material_flags', 'unk_float', 'build_flags']
+        misc_flags_param_names = ['alpha_blend_mode', 'face_cull_mode', 'material_flags', 'alpha_sort_depth_bias', 'build_flags']
         if not 'color_indices' in material_struct[i]:
             material_struct[i]['color_indices'] = material_struct[i]['unknown1']
         if not 'misc_flags' in material_struct[i]:

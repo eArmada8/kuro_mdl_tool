@@ -526,7 +526,7 @@ def obtain_material_data (mdl_data):
             material_block['uv_map_indices'] = list(struct.unpack("{0}B".format(uv_map_index_count),f.read(uv_map_index_count)))
             color_index_count, = struct.unpack("<I",f.read(4))
             material_block['color_indices'] = list(struct.unpack("{0}B".format(color_index_count),f.read(color_index_count)))
-            misc_flags_param_names = ['alpha_blend_mode', 'face_cull_mode', 'material_flags', 'unk_float', 'build_flags']
+            misc_flags_param_names = ['alpha_blend_mode', 'face_cull_mode', 'material_flags', 'alpha_sort_depth_bias', 'build_flags']
             material_block['misc_flags'] = dict(zip(misc_flags_param_names, list(struct.unpack("<3IfI",f.read(20)))))
             material_blocks.append(material_block)
         return(material_blocks)
