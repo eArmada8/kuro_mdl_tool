@@ -524,9 +524,10 @@ def obtain_material_data (mdl_data):
             material_block['shader_switches_hash_referenceonly'] = xxhash.xxh64_hexdigest(f.read(switch_end - switch_start))
             uv_map_index_count, = struct.unpack("<I",f.read(4))
             material_block['uv_map_indices'] = list(struct.unpack("{0}B".format(uv_map_index_count),f.read(uv_map_index_count)))
-            unknown1_count, = struct.unpack("<I",f.read(4))
-            material_block['unknown1'] = list(struct.unpack("{0}B".format(unknown1_count),f.read(unknown1_count)))
-            material_block['unknown2'] = list(struct.unpack("<3IfI",f.read(20)))
+            color_index_count, = struct.unpack("<I",f.read(4))
+            material_block['color_indices'] = list(struct.unpack("{0}B".format(color_index_count),f.read(color_index_count)))
+            misc_flags_param_names = ['alpha_blend_mode', 'face_cull_mode', 'material_flags', 'unk_float', 'build_flags']
+            material_block['misc_flags'] = dict(zip(misc_flags_param_names, list(struct.unpack("<3IfI",f.read(20)))))
             material_blocks.append(material_block)
         return(material_blocks)
 

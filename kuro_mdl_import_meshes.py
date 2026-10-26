@@ -167,9 +167,15 @@ def build_material_section (mdl_filename, material_list = [], kuro_ver = 1):
                 + struct.pack("<i", material_struct[i]['material_switches'][j]['int2'])
             material_switch_count += 1
         material_block += struct.pack("<I", material_switch_count) + material_switches
+        # Convert legacy metadata format
+        misc_flags_param_names = ['alpha_blend_mode', 'face_cull_mode', 'material_flags', 'unk_float', 'build_flags']
+        if not 'color_indices' in material_struct[i]:
+            material_struct[i]['color_indices'] = material_struct[i]['unknown1']
+        if not 'misc_flags' in material_struct[i]:
+            material_struct[i]['misc_flags'] = dict(zip(misc_flags_param_names, material_struct[i]['unknown2']))
         material_block += struct.pack("<I{0}B".format(len(material_struct[i]['uv_map_indices'])), len(material_struct[i]['uv_map_indices']), *material_struct[i]['uv_map_indices'])
-        material_block += struct.pack("<I{0}B".format(len(material_struct[i]['unknown1'])), len(material_struct[i]['unknown1']), *material_struct[i]['unknown1'])
-        material_block += struct.pack("<3IfI", *material_struct[i]['unknown2'])
+        material_block += struct.pack("<I{0}B".format(len(material_struct[i]['color_indices'])), len(material_struct[i]['color_indices']), *material_struct[i]['color_indices'])
+        material_block += struct.pack("<3IfI", *[material_struct[i]['misc_flags'].get(key) for key in misc_flags_param_names])
         output_buffer += material_block
     return(struct.pack("<2I", 0, len(output_buffer)) + output_buffer)
 
