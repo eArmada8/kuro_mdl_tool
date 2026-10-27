@@ -354,7 +354,7 @@ def process_gltf (gltf_filename, complete_maps = complete_vgmaps_default, overwr
         if not os.path.exists(model_name):
             os.mkdir(model_name)
         skel_struct = build_skeleton_struct (model_gltf, metadata)
-        mesh_nodes = [x for x in model_gltf.nodes if x.mesh is not None]
+        mesh_nodes = sorted([x for x in model_gltf.nodes if x.mesh is not None], key=lambda x: x.mesh)
         mesh_metadata = []
         collision_flags = {'CF':64, 'CA':24, 'CK':16, 'CS':8, 'CI':4, 'CP':2}
         for mesh_node in mesh_nodes:
