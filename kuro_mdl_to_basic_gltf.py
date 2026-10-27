@@ -285,6 +285,10 @@ def generate_materials(gltf_data, material_struct):
     gltf_data['images'] = [{'uri':'textures/{}.png'.format(x)} for x in images]
     khr = { "KHR_texture_transform": { "offset": [0, 0], "rotation": 0, "scale": [1, -1] } }
     for i in range(len(material_struct)):
+        # Convert legacy metadata format
+        misc_flags_param_names = ['alpha_blend_mode', 'face_cull_mode', 'material_flags', 'alpha_sort_depth_bias', 'build_flags']
+        if not 'misc_flags' in material_struct[i]:
+            material_struct[i]['misc_flags'] = dict(zip(misc_flags_param_names, material_struct[i]['unknown2']))
         material = { 'name': material_struct[i]['material_name'] }
         for j in range(len(material_struct[i]['textures'])):
             texture_slot = material_struct[i]['textures'][j]['texture_slot']
@@ -310,11 +314,11 @@ def generate_materials(gltf_data, material_struct):
             elif material_struct[i]['textures'][j]['texture_slot'] == 7:
                 material['occlusionTexture'] =  { 'index' : len(gltf_data['textures']), 'texCoord': material_struct[i]['uv_map_indices'][uv_map] }
                 material['occlusionTexture']['extensions'] = khr
-            if 'SWITCH_DOUBLESIDE' in material_switches and material_struct[i]['unknown2'][1] == 0:
+            if 'SWITCH_DOUBLESIDE' in material_switches and material_struct[i]['misc_flags']['face_cull_mode'] == 0:
                 material['doubleSided'] = True
             if 'SWITCH_ALPHATEST' in material_switches:
                 material['alphaMode'] = 'MASK'
-            elif material_struct[i]['unknown2'][0] == 1:
+            elif material_struct[i]['misc_flags']['alpha_blend_mode'] == 1:
                 material['alphaMode'] = 'BLEND'
             else:
                 material['alphaMode'] = 'OPAQUE'
