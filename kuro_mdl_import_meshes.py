@@ -70,6 +70,8 @@ def insert_model_data (mdl_data, skeleton_section_data, material_section_data, m
         # Add the null bytes at the end of the MDL file
         if kuro_ver > 1 and section_4_offset == 0:
             section_4_offset = len(new_mdl_data) # If there is no section 4 in MDL v2+, point to the null bytes
+            # If upgrading from v1, this will append the new section 4, otherwise no change (0 bytes added)
+            new_mdl_data.extend(primitive_section_data)
         new_mdl_data.extend(struct.pack("<i", -1))
         header = b'MDL ' + struct.pack("<2I", kuro_ver, section_4_offset)
         return(bytearray(header + new_mdl_data))

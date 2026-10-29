@@ -76,7 +76,7 @@ Shows help message.
 By default, the import script will detect if the current (pre-import) mdl file has CLE zstandard compression applied, and will compress the new file only if the current file is compressed.  Using this option will force the script to change the compression (*e.g.* it will change the output from compressed to non-compressed, or from non-compressed to compressed).
 
 `-f {1,2}, --force_version {1,2,3,4,5}`
-This option will tell the importer to force compile the MDL at a specific Kuro version.  *Note:* It is recommended to only downgrade (e.g. v4 -> v2 -> v1) and not upgrade (v1 -> v2 -> v4), although the latter is supported.  However, some models have garbage data in unused semantics (e.g. COLOR in chr5001_c03.mdl) that will crash the importer when it attempts to convert the data.
+This option will tell the importer to force compile the MDL at a specific Kuro version.  *Note:* It is recommended to only downgrade (e.g. v4 -> v2 -> v1) and not upgrade (v1 -> v2 -> v4), although the latter is supported.  However, some models have garbage data in unused semantics (e.g. COLOR in chr5001_c03.mdl) that will crash the importer when it attempts to convert the data; you can use the `-t, --trim_for_gpu` with kuro_mdl_export_meshes.py to strip this garbage data first (*warning* -> generic NPCs use the COLOR semantic so `-t, --trim_for_gpu` should *not* be used for those models).
 
 **Adding and deleting meshes**
 
