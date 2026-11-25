@@ -96,7 +96,7 @@ def calc_tangents (submesh):
     tan2 = [numpy.array([0.0,0.0,0.0]) for i in range(len(posBuffer))]
     for i in range(len(triangles)):
         x1 = posBuffer[triangles[i][1]][0] - posBuffer[triangles[i][0]][0]
-        x2 = posBuffer[triangles[i][1]][0] - posBuffer[triangles[i][0]][0]
+        x2 = posBuffer[triangles[i][2]][0] - posBuffer[triangles[i][0]][0]
         y1 = posBuffer[triangles[i][1]][1] - posBuffer[triangles[i][0]][1]
         y2 = posBuffer[triangles[i][2]][1] - posBuffer[triangles[i][0]][1]
         z1 = posBuffer[triangles[i][1]][2] - posBuffer[triangles[i][0]][2]
